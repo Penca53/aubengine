@@ -1185,60 +1185,36 @@ private:
 				if (!ec)
 				{
 					_isConnected = true;
-					DoReadHeader();
-				}
-			});
-	}
-
-	void DoReadHeader()
-	{
-		_socket.async_receive(asio::buffer(&_msgTemporaryIn.Header, sizeof(MessageHeader<T>)),
-			[this](std::error_code ec, std::size_t length)
-			{
-				if (!ec)
-				{
-					if (_msgTemporaryIn.Header.Size > 0)
-					{
-						_msgTemporaryIn.Body.resize(_msgTemporaryIn.Header.Size);
-						DoReadBody();
-					}
-					// Header-only message
-					else
-					{
-						AddToIncomingMessageQueue();
-					}
-				}
-				else
-				{
-					Disconnect();
-				}
-			});
-	}
-
-	void DoReadBody()
-	{
-		_socket.async_receive(asio::buffer(_msgTemporaryIn.Body.data(), _msgTemporaryIn.Body.size()),
-			[this](std::error_code ec, std::size_t length)
-			{
-				if (!ec)
-				{
-					AddToIncomingMessageQueue();
-				}
-				else
-				{
-					Disconnect();
+					DoReceive();
 				}
 			});
 	}
 
 	static const int UDP_DATAGRAM_SIZE = 64 * 1024;
 	uint8_t _udpBuffer[UDP_DATAGRAM_SIZE];
+	void DoReceive()
+	{
+		_socket.async_receive(
+			asio::buffer(_udpBuffer, UDP_DATAGRAM_SIZE),
+			[this](std::error_code ec, std::size_t bytesReceived)
+			{
+				if (!ec)
+				{
+					_msgTemporaryIn.FromBuffer(_udpBuffer, bytesReceived);
+					AddToIncomingMessageQueue();
+				}
+
+				DoReceive();
+			});
+	}
+
+	uint8_t _sendUdpBuffer[UDP_DATAGRAM_SIZE];
 	void DoSend()
 	{
 		auto message = _messagesOut.Front();
-		size_t length = message.ToBuffer(_udpBuffer);
+		size_t length = message.ToBuffer(_sendUdpBuffer);
 		_socket.async_send(
-			asio::buffer(_udpBuffer, length),
+			asio::buffer(_sendUdpBuffer, length),
 			[this](std::error_code ec, std::size_t bytesSent)
 			{
 				if (!ec)
@@ -1260,8 +1236,6 @@ private:
 	{
 		_msgTemporaryIn.Remote = nullptr;
 		_messagesIn.PushBack(_msgTemporaryIn);
-
-		DoReadHeader();
 	}
 
 public:
