@@ -68,6 +68,22 @@ template <typename T>
 class Message
 {
 public:
+	void FromBuffer(uint8_t* buffer, size_t length)
+	{
+		std::memcpy(&Header, buffer, sizeof(MessageHeader<T>));
+		Body.resize(Header.Size);
+		std::memcpy(Body.data(), buffer + sizeof(MessageHeader<T>), length - sizeof(MessageHeader<T>));
+	}
+
+	size_t ToBuffer(uint8_t* buffer)
+	{
+		std::memcpy(buffer, &Header, sizeof(MessageHeader<T>));
+		std::memcpy(buffer + sizeof(MessageHeader<T>), Body.data(), Body.size());
+
+		size_t length = (sizeof(MessageHeader<T>) + Body.size());
+		return length;
+	}
+
 	// returns size of entire message packet in bytes
 	size_t Size() const
 	{
@@ -134,6 +150,7 @@ public:
 	std::vector<uint8_t> Body;
 
 	std::shared_ptr<ClientSession<T>> Remote = nullptr;
+	asio::ip::udp::endpoint RemoteUDPEndpoint;
 private:
 	size_t _begin = 0;
 };
@@ -276,7 +293,10 @@ public:
 	{
 		if (IsConnected())
 		{
-			asio::post(_asioContext, [this]() { _socket.close(); });
+			asio::post(_asioContext, [this]()
+				{
+					_socket.close();
+				});
 		}
 
 		_isConnected = false;
@@ -325,6 +345,7 @@ private:
 				if (!ec)
 				{
 					AddToIncomingMessageQueue();
+					DoWriteHeader();
 				}
 				else
 				{
@@ -385,8 +406,6 @@ private:
 	{
 		_msgTemporaryIn.Remote = this->shared_from_this();
 		_qMessagesIn.PushBack(_msgTemporaryIn);
-
-		DoReadHeader();
 	}
 private:
 	asio::ip::tcp::socket _socket;
@@ -401,240 +420,7 @@ private:
 	bool _isConnected = false;
 };
 
-// Client
-template <typename T>
-class TCPClient
-{
-public:
-	TCPClient() : _socket(_asioContext)
-	{
 
-	}
-
-	virtual ~TCPClient()
-	{
-		// If the client is destroyed, always try and disconnect from server
-		std::cout << "Destroy Client\n";
-		Disconnect();
-	}
-
-public:
-	// Connect to server with hostname/ip-address and port
-	bool Connect(const std::string& host, const uint16_t port)
-	{
-		try
-		{
-			// Resolve hostname/ip-address into tangiable physical address
-			asio::ip::tcp::resolver resolver(_asioContext);
-			asio::ip::tcp::resolver::results_type endpoints = resolver.resolve(host, std::to_string(port));
-
-			DoConnect(endpoints);
-
-			// Start Context Thread
-			_threadContext = std::thread([this]() { _asioContext.run(); });
-		}
-		catch (std::exception& e)
-		{
-			std::cerr << "Client Exception: " << e.what() << "\n";
-			return false;
-		}
-		return true;
-	}
-
-	// Disconnect from server
-	void Disconnect()
-	{
-		if (IsConnected())
-		{
-			_socket.close();
-		}
-
-		_asioContext.stop();
-		if (_threadContext.joinable())
-		{
-			_threadContext.join();
-		}
-
-		Disconnected();
-		_isConnected = false;
-	}
-
-	// Check if client is actually connected to a server
-	bool IsConnected()
-	{
-		return _isConnected;
-	}
-
-	void UpdateNetwork(size_t maxMessages = -1, bool wait = false)
-	{
-		if (wait)
-		{
-			_messagesIn.Wait();
-		}
-
-		// Process as many messages as you can up to the value
-		// specified
-		size_t messageCount = 0;
-		while (messageCount < maxMessages && !_messagesIn.Empty())
-		{
-			// Grab the front message
-			auto msg = _messagesIn.PopFront();
-
-			// Pass to message handler
-			MessageReceived(msg);
-
-			messageCount++;
-		}
-	}
-
-	void Send(const Message<T>& msg)
-	{
-		asio::post(_asioContext,
-			[this, msg]()
-			{
-				bool bWritingMessage = !_messagesOut.Empty();
-				_messagesOut.PushBack(msg);
-				if (!bWritingMessage)
-				{
-					DoWriteHeader();
-				}
-			});
-	}
-
-	// Retrieve queue of messages from server
-	QueueThreadSafe<Message<T>>& Incoming()
-	{
-		return _messagesIn;
-	}
-
-private:
-	void DoConnect(const asio::ip::tcp::resolver::results_type& endpoints)
-	{
-		asio::async_connect(_socket, endpoints,
-			[this](asio::error_code ec, asio::ip::tcp::endpoint)
-			{
-				if (!ec)
-				{
-					_isConnected = true;
-					DoReadHeader();
-				}
-			});
-	}
-
-	void DoReadHeader()
-	{
-		asio::async_read(_socket, asio::buffer(&_msgTemporaryIn.Header, sizeof(MessageHeader<T>)),
-			[this](std::error_code ec, std::size_t length)
-			{
-				if (!ec)
-				{
-					if (_msgTemporaryIn.Header.Size > 0)
-					{
-						_msgTemporaryIn.Body.resize(_msgTemporaryIn.Header.Size);
-						DoReadBody();
-					}
-					// Header-only message
-					else
-					{
-						AddToIncomingMessageQueue();
-					}
-				}
-				else
-				{
-					Disconnect();
-				}
-			});
-	}
-
-	void DoReadBody()
-	{
-		asio::async_read(_socket, asio::buffer(_msgTemporaryIn.Body.data(), _msgTemporaryIn.Body.size()),
-			[this](std::error_code ec, std::size_t length)
-			{
-				if (!ec)
-				{
-					AddToIncomingMessageQueue();
-				}
-				else
-				{
-					Disconnect();
-				}
-			});
-	}
-
-	void DoWriteHeader()
-	{
-		asio::async_write(_socket, asio::buffer(&_messagesOut.Front().Header, sizeof(MessageHeader<T>)),
-			[this](std::error_code ec, std::size_t length)
-			{
-				if (!ec)
-				{
-					if (_messagesOut.Front().Body.size() > 0)
-					{
-						DoWriteBody();
-					}
-					// Header-only message
-					else
-					{
-						_messagesOut.PopFront();
-						if (!_messagesOut.Empty())
-						{
-							DoWriteHeader();
-						}
-					}
-				}
-				else
-				{
-					Disconnect();
-				}
-			});
-	}
-
-	void DoWriteBody()
-	{
-		asio::async_write(_socket, asio::buffer(_messagesOut.Front().Body.data(), _messagesOut.Front().Body.size()),
-			[this](std::error_code ec, std::size_t length)
-			{
-				if (!ec)
-				{
-					_messagesOut.PopFront();
-					if (!_messagesOut.Empty())
-					{
-						DoWriteHeader();
-					}
-				}
-				else
-				{
-					Disconnect();
-				}
-			});
-	}
-
-	void AddToIncomingMessageQueue()
-	{
-		_msgTemporaryIn.Remote = nullptr;
-		_messagesIn.PushBack(_msgTemporaryIn);
-
-		DoReadHeader();
-	}
-
-public:
-	Delegate<> Connected;
-	Delegate<Message<T>> MessageReceived;
-	Delegate<> Disconnected;
-
-private:
-	asio::io_context _asioContext;
-	asio::ip::tcp::socket _socket;
-	std::thread _threadContext;
-
-	QueueThreadSafe<Message<T>> _messagesIn;
-	QueueThreadSafe<Message<T>> _messagesOut;
-
-	Message<T> _msgTemporaryIn;
-
-	bool _isConnected = false;
-};
 
 
 template<typename T>
@@ -823,13 +609,12 @@ private:
 	uint32_t _IDCounter = 1;
 };
 
-/*
 template<typename T>
 class UDPServer
 {
 public:
 	UDPServer(uint16_t port)
-		: _AsioContext(), _AsioAcceptor(_AsioContext, asio::ip::udp::endpoint(asio::ip::tcp::v4(), port))
+		: _socket(_asioContext, asio::ip::udp::endpoint(asio::ip::udp::v4(), port))
 	{
 
 	}
@@ -844,7 +629,7 @@ public:
 		try
 		{
 			DoReceive();
-			_ThreadContext = std::thread([this]() { _AsioContext.run(); });
+			_ThreadContext = std::thread([this]() { _asioContext.run(); });
 		}
 		catch (std::exception& e)
 		{
@@ -852,102 +637,80 @@ public:
 			return false;
 		}
 
-		std::cout << "[SERVER] Started!\n";
+		std::cout << "[UDP SERVER] Started!\n";
 		return true;
 	}
 
 	void Stop()
 	{
-		_AsioContext.stop();
+		_asioContext.stop();
 
 		if (_ThreadContext.joinable())
 		{
 			_ThreadContext.join();
 		}
 
-		std::cout << "[SERVER] Stopped!\n";
+		std::cout << "[UDP SERVER] Stopped!\n";
 	}
 
+	void Send(const Message<T>& msg)
+	{
+		asio::post(_asioContext,
+			[this, msg]()
+			{
+				bool bWritingMessage = !_QMessagesOut.Empty();
+				_QMessagesOut.PushBack(msg);
+				if (!bWritingMessage)
+				{
+					DoSend();
+				}
+			});
+	}
+
+	static const int UDP_DATAGRAM_SIZE = 64 * 1024;
+	uint8_t _udpBuffer[UDP_DATAGRAM_SIZE];
 	void DoReceive()
 	{
 		_socket.async_receive_from(
-			asio::buffer(data_, max_length), sender_endpoint_,
-			[this](std::error_code ec, asio::ip::tcp::socket socket)
-			{
-				if (!ec)
-				{
-					std::cout << "[SERVER] New Connection: " << socket.remote_endpoint() << "\n";
-
-					auto newConnection = std::make_shared<ClientSession<T>>(std::move(socket), _AsioContext, _QMessagesIn);
-					ClientConnected(newConnection);
-
-					if (CanConnect(newConnection))
-					{
-						_DeqConnections.push_back(newConnection);
-						newConnection->ConnectToClient(_IDCounter++);
-						ClientApproved(newConnection);
-
-						std::cout << "[" << _DeqConnections.back()->GetID() << "] Connection Approved\n";
-					}
-					else
-					{
-						std::cout << "[-----] Connection Denied\n";
-					}
-				}
-				else
-				{
-					std::cout << "[SERVER] New Connection Error: " << ec.message() << "\n";
-				}
-
-				DoAccept();
-			});
-	}
-
-	void DoReadHeader()
-	{
-		asio::ip:udp::endpoint _senderEndpoint;
-		_socket.async_receive_from(
-			asio::buffer(&_msgTemporaryIn.Header, sizeof(MessageHeader<T>)),
+			asio::buffer(_udpBuffer, UDP_DATAGRAM_SIZE),
 			_senderEndpoint,
 			[this](std::error_code ec, std::size_t bytesReceived)
 			{
 				if (!ec)
 				{
-					if (_msgTemporaryIn.Header.Size > 0)
-					{
-						_msgTemporaryIn.Body.resize(_msgTemporaryIn.Header.Size);
-						DoReadBody();
-					}
-					// Header-only message
-					else
-					{
-						AddToIncomingMessageQueue();
-					}
-				}
-				else
-				{
-					Disconnect();
-				}
-			});
-	}
-
-	void DoReadBody()
-	{
-		asio::ip:udp::endpoint _senderEndpoint;
-		_socket.async_receive_from(asio::buffer(_msgTemporaryIn.Body.data(), _msgTemporaryIn.Body.size()),
-			_senderEndpoint,
-			[this](std::error_code ec, std::size_t bytesReceived)
-			{
-				if (!ec)
-				{
+					_msgTemporaryIn.FromBuffer(_udpBuffer, bytesReceived);
 					AddToIncomingMessageQueue();
 				}
+
+				DoReceive();
+			});
+	}
+
+	uint8_t _outUdpBuffer[UDP_DATAGRAM_SIZE];
+	void DoSend()
+	{
+		auto message = _QMessagesOut.Front();
+		size_t length = message.ToBuffer(_outUdpBuffer);
+		_socket.async_send_to(
+			asio::buffer(_outUdpBuffer, length),
+			message.RemoteUDPEndpoint,
+			[this](std::error_code ec, std::size_t bytesSent)
+			{
+				if (!ec)
+				{
+					_QMessagesOut.PopFront();
+					if (!_QMessagesOut.Empty())
+					{
+						DoSend();
+					}
+				}
 				else
 				{
-					Disconnect();
+					// Error
 				}
 			});
 	}
+
 
 	bool CanConnect(std::shared_ptr<ClientSession<T>> connection)
 	{
@@ -1009,6 +772,13 @@ public:
 		}
 	}
 
+	void AddToIncomingMessageQueue()
+	{
+		_msgTemporaryIn.Remote = nullptr;
+		_msgTemporaryIn.RemoteUDPEndpoint = _senderEndpoint;
+		_QMessagesIn.PushBack(_msgTemporaryIn);
+	}
+
 	// Force server to respond to incoming messages
 	void UpdateNetwork(size_t maxMessages = -1, bool wait = true)
 	{
@@ -1040,20 +810,474 @@ public:
 private:
 	// Thread Safe Queue for incoming message packets
 	QueueThreadSafe<Message<T>> _QMessagesIn;
+	QueueThreadSafe<Message<T>> _QMessagesOut;
 
 	// Container of active validated connections
 	std::deque<std::shared_ptr<ClientSession<T>>> _DeqConnections;
 
 	// Order of declaration is important - it is also the order of initialisation
-	asio::io_context _AsioContext;
+	asio::io_context _asioContext;
 	std::thread _ThreadContext;
 
 	// These things need an asio context
 	asio::ip::udp::socket _socket; // Handles new incoming connection attempts...
+	asio::ip::udp::endpoint _senderEndpoint;
 
 	Message<T> _msgTemporaryIn;
 
 	// Clients will be identified in the "wider system" via an ID
 	uint32_t _IDCounter = 1;
 };
-*/
+
+
+
+
+
+
+// Client
+template <typename T>
+class TCPClient
+{
+public:
+	TCPClient() : _socket(_asioContext)
+	{
+
+	}
+
+	virtual ~TCPClient()
+	{
+		// If the client is destroyed, always try and disconnect from server
+		std::cout << "Destroy Client\n";
+		Disconnect();
+	}
+
+public:
+	// Connect to server with hostname/ip-address and port
+	bool Connect(const std::string& host, const uint16_t port)
+	{
+		try
+		{
+			// Resolve hostname/ip-address into tangiable physical address
+			asio::ip::tcp::resolver resolver(_asioContext);
+			asio::ip::tcp::resolver::results_type endpoints = resolver.resolve(host, std::to_string(port));
+
+			DoConnect(endpoints);
+
+			// Start Context Thread
+			_threadContext = std::thread([this]() { _asioContext.run(); });
+		}
+		catch (std::exception& e)
+		{
+			std::cerr << "Client Exception: " << e.what() << "\n";
+			return false;
+		}
+		return true;
+	}
+
+	// Disconnect from server
+	void Disconnect()
+	{
+		if (IsConnected())
+		{
+			_socket.close();
+		}
+
+		_asioContext.stop();
+		if (_threadContext.joinable())
+		{
+			_threadContext.join();
+		}
+
+		Disconnected();
+		_isConnected = false;
+	}
+
+	// Check if client is actually connected to a server
+	bool IsConnected()
+	{
+		return _isConnected;
+	}
+
+	void UpdateNetwork(size_t maxMessages = -1, bool wait = false)
+	{
+		if (wait)
+		{
+			_messagesIn.Wait();
+		}
+
+		// Process as many messages as you can up to the value
+		// specified
+		size_t messageCount = 0;
+		while (messageCount < maxMessages && !_messagesIn.Empty())
+		{
+			// Grab the front message
+			auto msg = _messagesIn.PopFront();
+
+			// Pass to message handler
+			MessageReceived(msg);
+
+			messageCount++;
+		}
+	}
+
+	void Send(const Message<T>& msg)
+	{
+		asio::post(_asioContext,
+			[this, msg]()
+			{
+				bool bWritingMessage = !_messagesOut.Empty();
+				_messagesOut.PushBack(msg);
+				if (!bWritingMessage)
+				{
+					DoWriteHeader();
+				}
+			});
+	}
+
+	// Retrieve queue of messages from server
+	QueueThreadSafe<Message<T>>& Incoming()
+	{
+		return _messagesIn;
+	}
+
+private:
+	void DoConnect(const asio::ip::tcp::resolver::results_type& endpoints)
+	{
+		asio::async_connect(_socket, endpoints,
+			[this](asio::error_code ec, asio::ip::tcp::endpoint)
+			{
+				if (!ec)
+				{
+					_isConnected = true;
+					DoReadHeader();
+				}
+			});
+	}
+
+	void DoReadHeader()
+	{
+		asio::async_read(_socket, asio::buffer(&_msgTemporaryIn.Header, sizeof(MessageHeader<T>)),
+			[this](std::error_code ec, std::size_t length)
+			{
+				if (!ec)
+				{
+					if (_msgTemporaryIn.Header.Size > 0)
+					{
+						_msgTemporaryIn.Body.resize(_msgTemporaryIn.Header.Size);
+						DoReadBody();
+					}
+					// Header-only message
+					else
+					{
+						AddToIncomingMessageQueue();
+						DoReadHeader();
+					}
+				}
+				else
+				{
+					Disconnect();
+				}
+			});
+	}
+
+	void DoReadBody()
+	{
+		asio::async_read(_socket, asio::buffer(_msgTemporaryIn.Body.data(), _msgTemporaryIn.Body.size()),
+			[this](std::error_code ec, std::size_t length)
+			{
+				if (!ec)
+				{
+					AddToIncomingMessageQueue();
+					DoReadHeader();
+				}
+				else
+				{
+					Disconnect();
+				}
+			});
+	}
+
+	void DoWriteHeader()
+	{
+		asio::async_write(_socket, asio::buffer(&_messagesOut.Front().Header, sizeof(MessageHeader<T>)),
+			[this](std::error_code ec, std::size_t length)
+			{
+				if (!ec)
+				{
+					if (_messagesOut.Front().Body.size() > 0)
+					{
+						DoWriteBody();
+					}
+					// Header-only message
+					else
+					{
+						_messagesOut.PopFront();
+						if (!_messagesOut.Empty())
+						{
+							DoWriteHeader();
+						}
+					}
+				}
+				else
+				{
+					Disconnect();
+				}
+			});
+	}
+
+	void DoWriteBody()
+	{
+		asio::async_write(_socket, asio::buffer(_messagesOut.Front().Body.data(), _messagesOut.Front().Body.size()),
+			[this](std::error_code ec, std::size_t length)
+			{
+				if (!ec)
+				{
+					_messagesOut.PopFront();
+					if (!_messagesOut.Empty())
+					{
+						DoWriteHeader();
+					}
+				}
+				else
+				{
+					Disconnect();
+				}
+			});
+	}
+
+	void AddToIncomingMessageQueue()
+	{
+		_msgTemporaryIn.Remote = nullptr;
+		_messagesIn.PushBack(_msgTemporaryIn);
+	}
+
+public:
+	Delegate<> Connected;
+	Delegate<Message<T>> MessageReceived;
+	Delegate<> Disconnected;
+
+private:
+	asio::io_context _asioContext;
+	asio::ip::tcp::socket _socket;
+	std::thread _threadContext;
+
+	QueueThreadSafe<Message<T>> _messagesIn;
+	QueueThreadSafe<Message<T>> _messagesOut;
+
+	Message<T> _msgTemporaryIn;
+
+	bool _isConnected = false;
+};
+
+// Client
+template <typename T>
+class UDPClient
+{
+public:
+	UDPClient() : _socket(_asioContext)
+	{
+
+	}
+
+	virtual ~UDPClient()
+	{
+		// If the client is destroyed, always try and disconnect from server
+		std::cout << "Destroy Client\n";
+		Disconnect();
+	}
+
+public:
+	// Connect to server with hostname/ip-address and port
+	bool Connect(const std::string& host, const uint16_t port)
+	{
+		try
+		{
+			// Resolve hostname/ip-address into tangiable physical address
+			asio::ip::udp::resolver resolver(_asioContext);
+			asio::ip::udp::resolver::results_type endpoints = resolver.resolve(host, std::to_string(port));
+
+			DoConnect(endpoints);
+
+			// Start Context Thread
+			_threadContext = std::thread([this]() { _asioContext.run(); });
+		}
+		catch (std::exception& e)
+		{
+			std::cerr << "UDP Client Exception: " << e.what() << "\n";
+			return false;
+		}
+
+		return true;
+	}
+
+	// Disconnect from server
+	void Disconnect()
+	{
+		if (IsConnected())
+		{
+			_socket.close();
+		}
+
+		_asioContext.stop();
+		if (_threadContext.joinable())
+		{
+			_threadContext.join();
+		}
+
+		Disconnected();
+		_isConnected = false;
+	}
+
+	// Check if client is actually connected to a server
+	bool IsConnected()
+	{
+		return _isConnected;
+	}
+
+	void UpdateNetwork(size_t maxMessages = -1, bool wait = false)
+	{
+		if (wait)
+		{
+			_messagesIn.Wait();
+		}
+
+		// Process as many messages as you can up to the value
+		// specified
+		size_t messageCount = 0;
+		while (messageCount < maxMessages && !_messagesIn.Empty())
+		{
+			// Grab the front message
+			auto msg = _messagesIn.PopFront();
+
+			// Pass to message handler
+			MessageReceived(msg);
+
+			messageCount++;
+		}
+	}
+
+	void Send(const Message<T>& msg)
+	{
+		asio::post(_asioContext,
+			[this, msg]()
+			{
+				bool bWritingMessage = !_messagesOut.Empty();
+				_messagesOut.PushBack(msg);
+				if (!bWritingMessage)
+				{
+					DoSend();
+				}
+			});
+	}
+
+	// Retrieve queue of messages from server
+	QueueThreadSafe<Message<T>>& Incoming()
+	{
+		return _messagesIn;
+	}
+
+private:
+	void DoConnect(const asio::ip::udp::resolver::results_type& endpoints)
+	{
+		asio::async_connect(_socket, endpoints,
+			[this](asio::error_code ec, asio::ip::udp::endpoint)
+			{
+				if (!ec)
+				{
+					_isConnected = true;
+					DoReadHeader();
+				}
+			});
+	}
+
+	void DoReadHeader()
+	{
+		_socket.async_receive(asio::buffer(&_msgTemporaryIn.Header, sizeof(MessageHeader<T>)),
+			[this](std::error_code ec, std::size_t length)
+			{
+				if (!ec)
+				{
+					if (_msgTemporaryIn.Header.Size > 0)
+					{
+						_msgTemporaryIn.Body.resize(_msgTemporaryIn.Header.Size);
+						DoReadBody();
+					}
+					// Header-only message
+					else
+					{
+						AddToIncomingMessageQueue();
+					}
+				}
+				else
+				{
+					Disconnect();
+				}
+			});
+	}
+
+	void DoReadBody()
+	{
+		_socket.async_receive(asio::buffer(_msgTemporaryIn.Body.data(), _msgTemporaryIn.Body.size()),
+			[this](std::error_code ec, std::size_t length)
+			{
+				if (!ec)
+				{
+					AddToIncomingMessageQueue();
+				}
+				else
+				{
+					Disconnect();
+				}
+			});
+	}
+
+	static const int UDP_DATAGRAM_SIZE = 64 * 1024;
+	uint8_t _udpBuffer[UDP_DATAGRAM_SIZE];
+	void DoSend()
+	{
+		auto message = _messagesOut.Front();
+		size_t length = message.ToBuffer(_udpBuffer);
+		_socket.async_send(
+			asio::buffer(_udpBuffer, length),
+			[this](std::error_code ec, std::size_t bytesSent)
+			{
+				if (!ec)
+				{
+					_messagesOut.PopFront();
+					if (!_messagesOut.Empty())
+					{
+						DoSend();
+					}
+				}
+				else
+				{
+					Disconnect();
+				}
+			});
+	}
+
+	void AddToIncomingMessageQueue()
+	{
+		_msgTemporaryIn.Remote = nullptr;
+		_messagesIn.PushBack(_msgTemporaryIn);
+
+		DoReadHeader();
+	}
+
+public:
+	Delegate<> Connected;
+	Delegate<Message<T>> MessageReceived;
+	Delegate<> Disconnected;
+
+private:
+	asio::io_context _asioContext;
+	asio::ip::udp::socket _socket;
+	std::thread _threadContext;
+
+	QueueThreadSafe<Message<T>> _messagesIn;
+	QueueThreadSafe<Message<T>> _messagesOut;
+
+	Message<T> _msgTemporaryIn;
+
+	bool _isConnected = false;
+};

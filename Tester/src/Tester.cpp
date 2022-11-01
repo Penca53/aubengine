@@ -182,11 +182,19 @@ public:
 		_client.Disconnected += [this]() { OnDisconnect(); };
 
 		_client.Connect("127.0.0.1", 60000);
+
+
+		_udpClient.Connected += [this]() { OnConnect(); };
+		_udpClient.MessageReceived += [this](Message<CustomMsgTypes> msg) { OnMessage(msg); };
+		_udpClient.Disconnected += [this]() { OnDisconnect(); };
+
+		_udpClient.Connect("127.0.0.1", 60000);
 	}
 
 	void Update() override
 	{
 		_client.UpdateNetwork(-1, false);
+		_udpClient.UpdateNetwork(-1, false);
 		if (!_client.IsConnected())
 		{
 			return;
@@ -220,7 +228,7 @@ public:
 		auto timeNow = std::chrono::steady_clock::now();
 
 		msg.Write(timeNow);
-		_client.Send(msg);
+		_udpClient.Send(msg);
 	}
 protected:
 	void OnConnect()
@@ -598,6 +606,7 @@ protected:
 
 private:
 	TCPClient<CustomMsgTypes> _client;
+	UDPClient<CustomMsgTypes> _udpClient;
 
 	std::shared_ptr<ClientSession<CustomMsgTypes>> _server = nullptr;
 
@@ -618,7 +627,7 @@ private:
 class NetworkServer : public Component
 {
 public:
-	NetworkServer(uint16_t port) : _tcpServer(port)
+	NetworkServer(uint16_t port) : _tcpServer(port), _udpServer(port)
 	{
 
 	}
@@ -631,10 +640,18 @@ public:
 		_tcpServer.ClientDisconnected += [this](std::shared_ptr<ClientSession<CustomMsgTypes>> client) { OnClientDisconnect(client); };
 
 		_tcpServer.StartServer();
+
+		_udpServer.ClientConnected += [this](std::shared_ptr<ClientSession<CustomMsgTypes>> client) { OnClientConnect(client); };
+		_udpServer.ClientApproved += [this](std::shared_ptr<ClientSession<CustomMsgTypes>> client) { OnClientApprove(client); };
+		_udpServer.MessageReceived += [this](Message<CustomMsgTypes> msg) { OnMessage(msg); };
+		_udpServer.ClientDisconnected += [this](std::shared_ptr<ClientSession<CustomMsgTypes>> client) { OnClientDisconnect(client); };
+
+		_udpServer.StartServer();
 	}
 	virtual void Update() override
 	{
 		_tcpServer.UpdateNetwork(-1, false);
+		_udpServer.UpdateNetwork(-1, false);
 		SendWorldState();
 	}
 protected:
@@ -669,10 +686,12 @@ protected:
 		{
 		case CustomMsgTypes::ServerPing:
 		{
-			std::cout << "[" << msg.Remote->GetID() << "]: Server Ping\n";
+			//std::cout << "[" << msg.Remote->GetID() << "]: Server Ping\n";
+			std::cout << "UDP Server Ping\n";
 
 			// Simply bounce message back to client
-			msg.Remote->Send(msg);
+			//msg.Remote->Send(msg);
+			_udpServer.Send(msg);
 			break;
 		}
 		case CustomMsgTypes::Movement:
@@ -725,6 +744,7 @@ protected:
 	}
 private:
 	TCPServer<CustomMsgTypes> _tcpServer;
+	UDPServer<CustomMsgTypes> _udpServer;
 	std::unordered_map<int, Entity> _entities;
 	std::unordered_map<int, unsigned int> _lastProcessedInput;
 };

@@ -14,7 +14,7 @@ public:
 	virtual void Start() override
 	{
 		_context = (GladGLContext*)GameObject->GetScene()->GetWindow()->GetContext();
-		_shader = ResourceManager::LoadShader("../../OpenGL/src/shaders/default.vs.glsl", "../../OpenGL/src/shaders/default.fs.glsl", "sprite", _context);
+		_shader = ResourceManager::LoadShader("../../Aubengine/src/shaders/default.vs.glsl", "../../Aubengine/src/shaders/default.fs.glsl", "sprite", _context);
 
 		float vertices[] =
 		{
