@@ -143,6 +143,15 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\network\ClientSession.h" />
+    <ClInclude Include="include\network\Delegate.h" />
+    <ClInclude Include="include\network\Message.h" />
+    <ClInclude Include="include\network\Net.h" />
+    <ClInclude Include="include\network\QueueThreadSafe.h" />
+    <ClInclude Include="include\network\TCPClient.h" />
+    <ClInclude Include="include\network\TCPServer.h" />
+    <ClInclude Include="include\network\UDPClient.h" />
+    <ClInclude Include="include\network\UDPServer.h" />
     <ClInclude Include="src\BufferedLinearInterpolator.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

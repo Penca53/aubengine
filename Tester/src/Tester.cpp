@@ -15,25 +15,6 @@
 
 bool isServer = false;
 
-class BufferedLinearInterpolatorDouble : public BufferedLinearInterpolator<double>
-{
-public:
-	BufferedLinearInterpolatorDouble(uint32_t bufferCountLimit) : BufferedLinearInterpolator<double>(bufferCountLimit)
-	{
-
-	}
-
-	virtual double InterpolateUnclamped(double start, double end, double time) override
-	{
-		return start + (start - start) * time;
-	}
-
-	virtual double Interpolate(double start, double end, double time) override
-	{
-		return std::lerp(start, end, time);
-	}
-};
-
 class FPS
 {
 protected:
@@ -91,7 +72,7 @@ struct Position
 class Entity
 {
 public:
-	Entity() : Interpolator(150)
+	Entity()
 	{
 
 	}
@@ -100,7 +81,6 @@ public:
 	double Y = 300;
 	double Speed = 100;
 	std::deque<Position> PositionBuffer;
-	BufferedLinearInterpolatorDouble Interpolator;
 	unsigned int EntityId = 0;
 
 public:
@@ -162,6 +142,7 @@ enum class CustomMsgTypes : uint32_t
 	ServerAccept,
 	ServerDeny,
 	ServerPing,
+	ClientUDPPort,
 	Movement,
 	WorldState,
 };
@@ -252,6 +233,13 @@ protected:
 		{
 			_entityId = msg.Read<unsigned int>();
 			std::cout << "Server Accepted ClientSession - Client ID: " << _entityId << "\n";
+
+			Message<CustomMsgTypes> newMsg;
+			newMsg.Header.ID = CustomMsgTypes::ClientUDPPort;
+			uint16_t port = _udpClient.GetSocketPort();
+			newMsg.Write(port);
+
+			_client.Send(newMsg);
 			break;
 		}
 		case CustomMsgTypes::ServerPing:
@@ -314,11 +302,7 @@ protected:
 					}
 					else
 					{
-						//auto now = prev + std::chrono::milliseconds(20);
-						//prev = now;
 						auto now = std::chrono::steady_clock::now();
-						//auto serverTime = now.time_since_epoch().count() / 1000000000.0 - Ping;
-						//entity->Interpolator.AddMeasurement(state.Position, serverTime);
 						entity->PositionBuffer.push_back({ now, state.Position });
 					}
 				}
@@ -327,8 +311,6 @@ protected:
 		}
 		}
 	}
-
-	std::chrono::steady_clock::time_point prev = std::chrono::steady_clock::now();
 
 	float currentVelocity = 0;
 	void ProcessInputs()
@@ -376,61 +358,11 @@ protected:
 		_pendingInputs.push_back(input);
 	}
 
-	float SmoothDamp(float current, float target, float& currentVelocity, float smoothTime, float maxSpeed, float deltaTime)
-	{
-		// Based on Game Programming Gems 4 Chapter 1.10
-		smoothTime = std::max(0.0001F, smoothTime);
-		float omega = 2.0 / smoothTime;
-
-		float x = omega * deltaTime;
-		float exp = 1.0 / (1.0 + x + 0.48f * x * x + 0.235f * x * x * x);
-		float change = current - target;
-		float originalTo = target;
-
-		// Clamp maximum speed
-		float maxChange = maxSpeed * smoothTime;
-		change = std::clamp(change, -maxChange, maxChange);
-		target = current - change;
-
-		float temp = (currentVelocity + omega * change) * deltaTime;
-		currentVelocity = (currentVelocity - omega * temp) * exp;
-		float output = target + (change + temp) * exp;
-
-		// Prevent overshooting
-		if (originalTo - current > 0.0F == output > originalTo)
-		{
-			output = originalTo;
-			currentVelocity = (output - originalTo) / deltaTime;
-		}
-
-		return output;
-	}
-
-	/*
-	void InterpolateEntities()
-	{
-		auto now = std::chrono::steady_clock::now();
-		auto renderTimestamp = (now - std::chrono::milliseconds(1000 / 60)).time_since_epoch().count() / 1000000000.0;
-		auto serverTime = now.time_since_epoch().count() / 1000000000.0 - Ping;
-		for (auto& it : _entities)
-		{
-			Entity* entity = it.second;
-			if (entity->EntityId == _entityId)
-			{
-				continue;
-			}
-
-			BufferedLinearInterpolatorDouble& buffer = entity->Interpolator;
-			buffer.Update(0.01666667, renderTimestamp, serverTime);
-			entity->X = buffer.GetInterpolatedValue();
-		}
-	}
-	*/
 
 	void InterpolateEntities()
 	{
 		auto now = std::chrono::steady_clock::now();
-		auto renderTimestamp = now - std::chrono::milliseconds(200);
+		auto renderTimestamp = now - std::chrono::milliseconds(400);
 		for (auto& it : _entities)
 		{
 			Entity* entity = it.second;
@@ -457,153 +389,6 @@ protected:
 			}
 		}
 	}
-
-
-	/*
-	void InterpolateEntities()
-	{
-		auto now = std::chrono::steady_clock::now();
-		auto renderTimestamp = now - std::chrono::nanoseconds(1000000000LL / 50LL * 3LL);
-
-		for (auto& it : _entities)
-		{
-			Entity* entity = it.second;
-			if (entity->EntityId == _entityId)
-			{
-				continue;
-			}
-
-			std::deque<Position>& buffer = entity->PositionBuffer;
-
-
-			while (buffer.size() >= 3 && buffer[1].timestamp <= renderTimestamp)
-			{
-				buffer.pop_front();
-			}
-
-			if (buffer.size() >= 2 && buffer[0].timestamp <= renderTimestamp && renderTimestamp <= buffer[1].timestamp)
-			{
-				auto x0 = buffer[0].position;
-				auto x1 = buffer[1].position;
-				auto t0 = buffer[0].timestamp;
-				auto t1 = buffer[1].timestamp;
-
-				entity->X = x0 + ((x1 - x0) * (renderTimestamp - t0)) / (t1 - t0);
-
-				buffer.pop_front();
-			}
-		}
-	}
-	*/
-
-
-	int Sign(float a)
-	{
-		if (a > 0)
-		{
-			return 1;
-		}
-		else
-		{
-			return -1;
-		}
-	}
-
-	float MoveTowards(float current, float target, float maxDelta)
-	{
-		if (std::abs(target - current) <= maxDelta)
-		{
-			return target;
-		}
-		return current + Sign(target - current) * maxDelta;
-	}
-
-
-	/*
-	void InterpolateEntities()
-	{
-		auto now = std::chrono::steady_clock::now();
-		auto renderTimestamp = now - std::chrono::nanoseconds(100000000);
-
-		for (auto& it : _entities)
-		{
-			Entity* entity = it.second;
-			if (entity->EntityId == _entityId)
-			{
-				continue;
-			}
-
-			std::deque<Position>& buffer = entity->PositionBuffer;
-
-			while (buffer.size() >= 2 && buffer[1].timestamp <= renderTimestamp)
-			{
-				buffer.pop_front();
-			}
-
-			if (buffer.size() >= 2 && buffer[0].timestamp <= renderTimestamp && renderTimestamp <= buffer[1].timestamp)
-			{
-				entity->X = MoveTowards(entity->X, buffer[1].position, 1000 * 0.016667);
-			}
-		}
-	}
-	*/
-
-	/*
-	void InterpolateEntities()
-	{
-		auto now = std::chrono::steady_clock::now();
-		for (auto& it : _entities)
-		{
-			Entity* entity = it.second;
-			if (entity->EntityId == _entityId)
-			{
-				continue;
-			}
-
-			std::deque<Position>& buffer = entity->PositionBuffer;
-			if (buffer.size() > 0)
-			{
-				// TODO: remove magic numbers
-				double time = std::chrono::duration_cast<std::chrono::nanoseconds>(now - buffer[0].timestamp).count() / 1000000000.0;
-				entity->X = SmoothDamp(entity->X, buffer[0].position, currentVelocity, time, 1000000, 0.0166667);
-
-				if (std::abs(buffer[0].position - entity->X) < 0.1f)
-				{
-					buffer.pop_front();
-				}
-			}
-
-		}
-	}
-	*/
-
-
-	/*
-	void InterpolateEntities()
-	{
-		for (auto& it : _entities)
-		{
-			Entity* entity = it.second;
-			if (entity->EntityId == _entityId)
-			{
-				continue;
-			}
-
-			std::deque<Position>& buffer = entity->PositionBuffer;
-			while (buffer.size() > 1)
-			{
-				buffer.pop_front();
-			}
-
-			if (!buffer.empty())
-			{
-				// TODO: remove magic numbers
-				entity->X = MoveTowards(entity->X, buffer[0].position, 0.016 * 100);
-			}
-		}
-	}
-	*/
-
 private:
 	TCPClient<CustomMsgTypes> _client;
 	UDPClient<CustomMsgTypes> _udpClient;
@@ -618,7 +403,7 @@ private:
 	unsigned int _inputSequenceNumber = 0;
 	std::vector<InputData> _pendingInputs;
 
-	bool _entityInterpolation = true;
+	bool _entityInterpolation = false;
 
 	bool _isFirstTs = true;
 	std::chrono::steady_clock::time_point _lastTs;
@@ -638,14 +423,9 @@ public:
 		_tcpServer.ClientApproved += [this](std::shared_ptr<ClientSession<CustomMsgTypes>> client) { OnClientApprove(client); };
 		_tcpServer.MessageReceived += [this](Message<CustomMsgTypes> msg) { OnMessage(msg); };
 		_tcpServer.ClientDisconnected += [this](std::shared_ptr<ClientSession<CustomMsgTypes>> client) { OnClientDisconnect(client); };
-
 		_tcpServer.StartServer();
 
-		_udpServer.ClientConnected += [this](std::shared_ptr<ClientSession<CustomMsgTypes>> client) { OnClientConnect(client); };
-		_udpServer.ClientApproved += [this](std::shared_ptr<ClientSession<CustomMsgTypes>> client) { OnClientApprove(client); };
 		_udpServer.MessageReceived += [this](Message<CustomMsgTypes> msg) { OnMessage(msg); };
-		_udpServer.ClientDisconnected += [this](std::shared_ptr<ClientSession<CustomMsgTypes>> client) { OnClientDisconnect(client); };
-
 		_udpServer.StartServer();
 	}
 	virtual void Update() override
@@ -694,6 +474,17 @@ protected:
 			_udpServer.Send(msg);
 			break;
 		}
+		case CustomMsgTypes::ClientUDPPort:
+		{
+			//std::cout << "[" << msg.Remote->GetID() << "]: Server Ping\n";
+			std::cout << "TCP ClientUDPPort Ping\n";
+
+			uint16_t port = msg.Read<uint16_t>();
+			std::cout << "Their port is " << port << "\n";
+
+			msg.TCPRemote->UDPPort = port;
+			break;
+		}
 		case CustomMsgTypes::Movement:
 		{
 			InputData input = msg.Read<InputData>();
@@ -740,7 +531,15 @@ protected:
 		}
 
 		msg.WriteVector(states);
-		_tcpServer.MessageAllClients(msg);
+		for (auto& conn : _tcpServer.Connections)
+		{
+			asio::ip::udp::endpoint endpoint;
+			if (conn->TryGetUDPEndpoint(endpoint))
+			{
+				msg.UDPRemote = endpoint;
+				_udpServer.Send(msg);
+			}
+		}
 	}
 private:
 	TCPServer<CustomMsgTypes> _tcpServer;
