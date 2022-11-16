@@ -13,6 +13,9 @@ Aubengine is a code based game engine, with no GUI or custom tool. Every operati
 Documentation will be a future addition. 
 
 ## Showcase
+![showcase2](https://user-images.githubusercontent.com/38438406/202306014-c8dab8a4-8fdc-427e-96cb-ddcc2fafd37f.gif)
+
+
 
 ## Usage
 
