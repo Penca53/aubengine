@@ -6,6 +6,7 @@
 #include "Window.h"
 #include "RenderAPI.h"
 
+
 namespace Aubengine
 {
 	class Application

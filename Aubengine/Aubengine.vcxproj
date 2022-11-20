@@ -164,6 +164,7 @@
     <ClInclude Include="include\KHR\khrplatform.h" />
     <ClInclude Include="include\stb_image.h" />
     <ClInclude Include="src\Application.h" />
+    <ClInclude Include="src\Components\BoxCollider2D.h" />
     <ClInclude Include="src\Components\Component.h" />
     <ClInclude Include="src\Components\SpriteRenderer2D.h" />
     <ClInclude Include="src\Components\Transform.h" />
@@ -186,6 +187,10 @@
   <ItemGroup>
     <None Include="src\shaders\default.fs.glsl" />
     <None Include="src\shaders\default.vs.glsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="src\textures\awesomeface.png" />
+    <Image Include="src\textures\block.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -9,13 +9,14 @@
 #include "stb_image.h"
 
 // Instantiate static variables
-std::map<std::string, Texture2D> ResourceManager::Textures;
+std::map<std::string, std::shared_ptr<Texture2D>> ResourceManager::Textures;
 std::map<std::string, std::shared_ptr<Shader>> ResourceManager::Shaders;
 
 
 std::shared_ptr<Shader> ResourceManager::LoadShader(const char* vShaderFile, const char* fShaderFile, std::string name, GladGLContext* context)
 {
-	return LoadShaderFromFile(vShaderFile, fShaderFile, context);
+	Shaders[name] = LoadShaderFromFile(vShaderFile, fShaderFile, context);
+	return Shaders[name];
 }
 
 std::shared_ptr<Shader> ResourceManager::GetShader(std::string name)
@@ -23,13 +24,13 @@ std::shared_ptr<Shader> ResourceManager::GetShader(std::string name)
 	return Shaders[name];
 }
 
-Texture2D ResourceManager::LoadTexture(const char* file, bool alpha, std::string name, GladGLContext* context)
+std::shared_ptr<Texture2D> ResourceManager::LoadTexture(const char* file, bool alpha, std::string name, GladGLContext* context)
 {
 	Textures[name] = LoadTextureFromFile(file, alpha, context);
 	return Textures[name];
 }
 
-Texture2D ResourceManager::GetTexture(std::string name)
+std::shared_ptr<Texture2D> ResourceManager::GetTexture(std::string name)
 {
 	return Textures[name];
 }
@@ -41,7 +42,7 @@ void ResourceManager::Clear(GladGLContext* context)
 		context->DeleteProgram(iter.second->ID);
 	// (properly) delete all textures
 	for (auto& iter : Textures)
-		context->DeleteTextures(1, &iter.second.ID);
+		context->DeleteTextures(1, &iter.second->ID);
 }
 
 std::shared_ptr<Shader> ResourceManager::LoadShaderFromFile(const char* vShaderFile, const char* fShaderFile, GladGLContext* context)
@@ -78,20 +79,20 @@ std::shared_ptr<Shader> ResourceManager::LoadShaderFromFile(const char* vShaderF
 	return shader;
 }
 
-Texture2D ResourceManager::LoadTextureFromFile(const char* file, bool alpha, GladGLContext* context)
+std::shared_ptr<Texture2D> ResourceManager::LoadTextureFromFile(const char* file, bool alpha, GladGLContext* context)
 {
 	// create texture object
-	Texture2D texture;
+	std::shared_ptr<Texture2D> texture = std::make_shared<Texture2D>(context);
 	if (alpha)
 	{
-		texture.Internal_Format = GL_RGBA;
-		texture.Image_Format = GL_RGBA;
+		texture->Internal_Format = GL_RGBA;
+		texture->Image_Format = GL_RGBA;
 	}
 	// load image
 	int width, height, nrChannels;
 	unsigned char* data = stbi_load(file, &width, &height, &nrChannels, 0);
 	// now generate texture
-	texture.Generate(width, height, data);
+	texture->Generate(width, height, data);
 	// and finally free image data
 	stbi_image_free(data);
 	return texture;

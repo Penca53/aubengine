@@ -7,11 +7,12 @@
 #include <GameObject.h>
 #include <Components/Transform.h>
 #include <Components/SpriteRenderer2D.h>
-#include "network/Net.h"
-#include "Prefab.h"
 #include <deque>
 #include <limits>
-#include "BufferedLinearInterpolator.h"
+
+#include "network/Net.h"
+#include "Prefab.h"
+#include <Components/BoxCollider2D.h>
 
 bool isServer = false;
 
@@ -122,19 +123,42 @@ private:
 	Entity* _entity = nullptr;
 };
 
-class PlayerTrianglePrefab : public GameObject
+class PlayerPaddlePrefab : public GameObject
 {
 public:
-	PlayerTrianglePrefab(Scene* scene) : GameObject(scene, "Triangle")
+	PlayerPaddlePrefab(Scene* scene) : GameObject(scene, "PlayerPaddle")
 	{
 		Transform* transform = AddComponent<Transform>();
-		SpriteRenderer2D* sr2D = AddComponent<SpriteRenderer2D>();
+		auto shader = ResourceManager::GetShader("default");
+		auto texture = ResourceManager::GetTexture("paddle");
+
+		AddComponent<SpriteRenderer2D>(shader, texture);
+		AddComponent<BoxCollider2D>();
 		AddComponent<MovementManager>();
 
 		transform->Position = { 400, 300, 0 };
-		transform->Size = { 400, 300, 1 };
+		transform->Size = { 512 / 5.0, 128 / 5.0, 1 };
 	}
 };
+
+class BlockPrefab : public GameObject
+{
+public:
+	BlockPrefab(Scene* scene) : GameObject(scene, "Block")
+	{
+		Transform* transform = AddComponent<Transform>();
+		auto shader = ResourceManager::GetShader("default");
+		auto texture = ResourceManager::GetTexture("block");
+
+		AddComponent<SpriteRenderer2D>(shader, texture);
+		AddComponent<BoxCollider2D>();
+
+		transform->Position = { 400, 300, 0 };
+		transform->Size = { 128 / 4.0, 128 / 4.0, 1 };
+	}
+};
+
+
 
 
 enum class CustomMsgTypes : uint32_t
@@ -158,11 +182,11 @@ public:
 	int ticks = 0;
 	void Start()
 	{
-		_client.Connected += [this]() { OnConnect(); };
-		_client.MessageReceived += [this](Message<CustomMsgTypes> msg) { OnMessage(msg); };
-		_client.Disconnected += [this]() { OnDisconnect(); };
+		_tcpClient.Connected += [this]() { OnConnect(); };
+		_tcpClient.MessageReceived += [this](Message<CustomMsgTypes> msg) { OnMessage(msg); };
+		_tcpClient.Disconnected += [this]() { OnDisconnect(); };
 
-		_client.Connect("127.0.0.1", 60000);
+		_tcpClient.Connect("127.0.0.1", 60000);
 
 
 		_udpClient.Connected += [this]() { OnConnect(); };
@@ -174,9 +198,9 @@ public:
 
 	void Update() override
 	{
-		_client.UpdateNetwork(-1, false);
+		_tcpClient.UpdateNetwork(-1, false);
 		_udpClient.UpdateNetwork(-1, false);
-		if (!_client.IsConnected())
+		if (!_tcpClient.IsConnected())
 		{
 			return;
 		}
@@ -239,7 +263,7 @@ protected:
 			uint16_t port = _udpClient.GetSocketPort();
 			newMsg.Write(port);
 
-			_client.Send(newMsg);
+			_tcpClient.Send(newMsg);
 			break;
 		}
 		case CustomMsgTypes::ServerPing:
@@ -263,7 +287,7 @@ protected:
 					entity->EntityId = state.EntityId;
 					_entities[state.EntityId] = entity;
 
-					PlayerTrianglePrefab* player = GameObject->GetScene()->Instantiate<PlayerTrianglePrefab>();
+					PlayerPaddlePrefab* player = GameObject->GetScene()->Instantiate<PlayerPaddlePrefab>();
 					player->GetComponent<MovementManager>()->SetEntity(entity);
 				}
 
@@ -348,7 +372,7 @@ protected:
 		msg.Header.ID = CustomMsgTypes::Movement;
 
 		msg.Write(input);
-		_client.Send(msg);
+		_tcpClient.Send(msg);
 
 		if (_clientSidePrediction)
 		{
@@ -390,10 +414,8 @@ protected:
 		}
 	}
 private:
-	TCPClient<CustomMsgTypes> _client;
+	TCPClient<CustomMsgTypes> _tcpClient;
 	UDPClient<CustomMsgTypes> _udpClient;
-
-	std::shared_ptr<ClientSession<CustomMsgTypes>> _server = nullptr;
 
 	std::unordered_map<int, Entity*> _entities;
 	unsigned int _entityId = 0;
@@ -576,6 +598,11 @@ class MainScene : public Scene
 public:
 	MainScene(std::shared_ptr<Window> window, SpriteRenderer* renderer) : Scene(window, renderer)
 	{
+		auto ctx = static_cast<GladGLContext*>(window->GetContext());
+		ResourceManager::LoadShader("../../Aubengine/src/shaders/default.vs.glsl", "../../Aubengine/src/shaders/default.fs.glsl", "default", ctx);
+		ResourceManager::LoadTexture("../../Aubengine/src/textures/block.png", false, "block", ctx);
+		ResourceManager::LoadTexture("../../Aubengine/src/textures/paddle.png", true, "paddle", ctx);
+
 		if (isServer)
 		{
 			networkServer = Instantiate<NetworkServerPrefab>();
@@ -583,6 +610,12 @@ public:
 		else
 		{
 			networkClient = Instantiate<NetworkClientPrefab>();
+		}
+
+		for (int i = 0; i < 5; ++i)
+		{
+			auto block = Instantiate<BlockPrefab>();
+			block->GetComponent<Transform>()->Position.x = i * 100 + 100;
 		}
 
 		//Instantiate<PlayerTrianglePrefab>();
@@ -611,13 +644,13 @@ void TesterInitializer()
 
 
 	/*
-	auto window2 = app.CreateWindow(RenderAPI::OPEN_GL);
+	auto window2 = app.CreateWindowOpenGL();
 	window2->Initialize("Second", 800, 600);
+	window2->SetVSync(true);
 
 	window2->Use();
-	std::shared_ptr<MainScene> mainScene2 = std::make_shared<MainScene>();
-	mainScene2->Initialize((GladGLContext*)window2->GetContext());
-	window2->SetScene(mainScene2);
+	std::shared_ptr<MainScene> mainScene2 = std::make_shared<MainScene>(window2, &renderer);
+	window1->SetScene(mainScene2);
 	*/
 }
 

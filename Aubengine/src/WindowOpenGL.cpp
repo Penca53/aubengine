@@ -3,7 +3,7 @@
 #include <iostream>
 #include <glad/gl.h>
 
-
+static std::unordered_map<GLFWwindow*, GladGLContext*> _windowToContext;
 uint8_t WindowOpenGL::_windowOpenGLInstancesCount = 0;
 
 WindowOpenGL::~WindowOpenGL()
@@ -44,9 +44,17 @@ bool WindowOpenGL::Initialize(std::string title, uint32_t width, uint32_t height
 		return false;
 	}
 
-	++_windowOpenGLInstancesCount;
+	_windowToContext[_window] = _context;
 
+	++_windowOpenGLInstancesCount;
+	glfwSetFramebufferSizeCallback(_window, [](GLFWwindow* window, int width, int height)
+		{
+			glfwMakeContextCurrent(window);
+			auto ctx = _windowToContext[window];
+			ctx->Viewport(0, 0, width, height);
+		});
 	_context->Viewport(0, 0, width, height);
+
 	return true;
 }
 void WindowOpenGL::Close()
@@ -98,6 +106,8 @@ void WindowOpenGL::Render()
 
 	_context->ClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 	_context->Clear(GL_COLOR_BUFFER_BIT);
+	_context->BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	_context->Enable(GL_BLEND);
 
 	if (!_Scene)
 	{

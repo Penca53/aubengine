@@ -20,9 +20,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\BufferedLinearInterpolator.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="include\network\Net.h">
       <Filter>Header Files</Filter>
     </ClInclude>

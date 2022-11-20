@@ -7,7 +7,6 @@
 #include "ResourceManager.h"
 #include "Input.h"
 
-
 namespace Aubengine
 {
 	Application& Application::GetInstance()
@@ -84,6 +83,7 @@ namespace Aubengine
 		}
 		Input::PollInput();
 	}
+
 
 	void Application::Update()
 	{

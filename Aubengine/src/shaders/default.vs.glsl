@@ -1,15 +1,14 @@
 #version 330 core
 
-layout (location = 0) in vec3 aPos;
-layout (location = 1) in vec3 aColor;
-out vec3 ourColor;
+layout (location = 0) in vec2 attrPosition;
+layout (location = 1) in vec2 attrTexCoords;
+out vec2 texCoords;
 
 uniform mat4 model;
-// note that we're omitting the view matrix; the view never changes so we basically have an identity view matrix and can therefore omit it.
 uniform mat4 projection;
 
 void main()
 {
-	gl_Position = projection * model * vec4(aPos, 1.0);
-	ourColor = aColor;
+	texCoords = attrTexCoords;
+	gl_Position = projection * model * vec4(attrPosition, 0.0, 1.0);
 }

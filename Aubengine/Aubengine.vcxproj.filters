@@ -139,9 +139,20 @@
     <ClInclude Include="src\Prefab.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\Components\BoxCollider2D.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="src\shaders\default.vs.glsl" />
     <None Include="src\shaders\default.fs.glsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="src\textures\block.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="src\textures\awesomeface.png">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>

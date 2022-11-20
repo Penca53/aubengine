@@ -24,15 +24,17 @@ void SpriteRenderer::DrawSprite(GameObject* go)
 	model = glm::scale(model, transform->Size); // last scale
 	auto projection = glm::ortho(0.0f, 800.0f, 0.0f, 600.0f);
 
+	sprite->_shader->SetInteger("image", 0);
 	sprite->_shader->SetMatrix4("model", model);
 	sprite->_shader->SetMatrix4("projection", projection);
+	sprite->_shader->SetVector3f("spriteColor", sprite->Color);
 
 	// render textured quad
 
-	//_context->ActiveTexture(GL_TEXTURE0);
-	//texture.Bind();
+	sprite->_context->ActiveTexture(GL_TEXTURE0);
+	sprite->_texture2D->Bind();
 
 	sprite->_context->BindVertexArray(sprite->_quadVAO);
-	sprite->_context->DrawArrays(GL_TRIANGLES, 0, 3);
+	sprite->_context->DrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	sprite->_context->BindVertexArray(0);
 }
