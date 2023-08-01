@@ -14,6 +14,8 @@ file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS
         )
 add_library(${PROJECT_NAME} ${SRC_FILES})
 
+target_compile_definitions(${PROJECT_NAME} PUBLIC GLM_FORCE_CXX11)
+
 target_include_directories(${PROJECT_NAME} PUBLIC ./include)
 
 if(MSVC)
