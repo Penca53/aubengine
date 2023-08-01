@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <iostream>
 #include <limits>
+#include <unordered_map>
 
 #include "aubengine/application.h"
 #include "aubengine/components/box_collider_2d.h"
