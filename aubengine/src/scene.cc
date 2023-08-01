@@ -3,25 +3,30 @@
 #include "aubengine/game_object.h"
 #include "aubengine/sprite_renderer.h"
 
-Scene::Scene(std::shared_ptr<Window> window, SpriteRenderer* renderer) :window_(window), renderer_(renderer) {
-}
+Scene::Scene(Window* window, SpriteRenderer* renderer)
+    : window_(window), renderer_(renderer) {}
 
 void Scene::Update() {
-  for (auto& go : game_objects_) {
+  for (const auto& go : game_objects_) {
     go->Update();
   }
 }
 
 void Scene::Render() {
-  for (auto& go : game_objects_) {
-    renderer_->DrawSprite(go);
+  for (const auto& go : game_objects_) {
+    renderer_->DrawSprite(go.get());
   }
 }
 
 void Scene::Destroy(GameObject* game_object) {
-  if (game_objects_.count(game_object)) {
-    game_objects_.erase(game_object);
+  auto it = std::find_if(game_objects_.begin(), game_objects_.end(),
+                         [game_object](std::shared_ptr<GameObject> const& i) {
+                           return i.get() == game_object;
+                         });
+
+  if (it != game_objects_.end()) {
+    game_objects_.erase(it);
   }
 }
 
-std::shared_ptr<Window> Scene::GetWindow() { return window_; }
+Window* Scene::GetWindow() { return window_; }

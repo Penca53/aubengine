@@ -18,7 +18,7 @@ class Application {
   uint64_t NanosecondsPerUpdate();
   void Run(uint32_t hz);
   void Run();
-  std::shared_ptr<Window> CreateWindowOpenGL();
+  Window* CreateWindowOpenGL();
 
   void PollInput();
   void Update();
@@ -36,6 +36,5 @@ class Application {
 
  private:
   uint32_t hz_ = 0;
-  uint32_t ms_per_update_ = 0;
 };
 }  // namespace Aubengine

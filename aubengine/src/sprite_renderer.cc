@@ -12,7 +12,7 @@ void SpriteRenderer::DrawSprite(GameObject* go) {
   }
 
   // prepare transformations
-  sprite->_shader->Use();
+  sprite->shader_->Use();
   glm::mat4 model = glm::mat4(1.0f);
   model = glm::translate(
       model,
@@ -32,17 +32,17 @@ void SpriteRenderer::DrawSprite(GameObject* go) {
   model = glm::scale(model, transform->size);  // last scale
   auto projection = glm::ortho(0.0f, 800.0f, 0.0f, 600.0f);
 
-  sprite->_shader->SetInteger("image", 0);
-  sprite->_shader->SetMatrix4("model", model);
-  sprite->_shader->SetMatrix4("projection", projection);
-  sprite->_shader->SetVector3f("spriteColor", sprite->Color);
+  sprite->shader_->SetInteger("image", 0);
+  sprite->shader_->SetMatrix4("model", model);
+  sprite->shader_->SetMatrix4("projection", projection);
+  sprite->shader_->SetVector3f("spriteColor", sprite->color_);
 
   // render textured quad
 
-  sprite->_context->ActiveTexture(GL_TEXTURE0);
-  sprite->_texture2D->Bind();
+  sprite->context_->ActiveTexture(GL_TEXTURE0);
+  sprite->texture_2d_->Bind();
 
-  sprite->_context->BindVertexArray(sprite->_quadVAO);
-  sprite->_context->DrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-  sprite->_context->BindVertexArray(0);
+  sprite->context_->BindVertexArray(sprite->quad_vao_);
+  sprite->context_->DrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+  sprite->context_->BindVertexArray(0);
 }

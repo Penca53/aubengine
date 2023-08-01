@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Delegate.h"
+#include "network/delegate.h"
 
 // Client
 template <typename T>
@@ -46,23 +46,23 @@ class TCPClient {
     }
 
     Disconnected();
-    _isConnected = false;
+    is_connected_ = false;
   }
 
   // Check if client is actually connected to a server
-  bool IsConnected() { return _isConnected; }
+  bool IsConnected() { return is_connected_; }
 
   void UpdateNetwork(size_t maxMessages = -1, bool wait = false) {
     if (wait) {
-      _messagesIn.Wait();
+      messages_in_.Wait();
     }
 
     // Process as many messages as you can up to the value
     // specified
     size_t messageCount = 0;
-    while (messageCount < maxMessages && !_messagesIn.Empty()) {
+    while (messageCount < maxMessages && !messages_in_.Empty()) {
       // Grab the front message
-      auto msg = _messagesIn.PopFront();
+      auto msg = messages_in_.PopFront();
 
       // Pass to message handler
       MessageReceived(msg);
@@ -73,8 +73,8 @@ class TCPClient {
 
   void Send(const Message<T>& msg) {
     asio::post(_asioContext, [this, msg]() {
-      bool bWritingMessage = !_messagesOut.Empty();
-      _messagesOut.PushBack(msg);
+      bool bWritingMessage = !messages_out_.Empty();
+      messages_out_.PushBack(msg);
       if (!bWritingMessage) {
         DoWriteHeader();
       }
@@ -82,14 +82,14 @@ class TCPClient {
   }
 
   // Retrieve queue of messages from server
-  QueueThreadSafe<Message<T>>& Incoming() { return _messagesIn; }
+  QueueThreadSafe<Message<T>>& Incoming() { return messages_in_; }
 
  private:
   void DoConnect(const asio::ip::tcp::resolver::results_type& endpoints) {
     asio::async_connect(_socket, endpoints,
                         [this](asio::error_code ec, asio::ip::tcp::endpoint) {
                           if (!ec) {
-                            _isConnected = true;
+                            is_connected_ = true;
                             DoReadHeader();
                           }
                         });
@@ -99,7 +99,7 @@ class TCPClient {
     asio::async_read(
         _socket,
         asio::buffer(&_msgTemporaryIn.Header, sizeof(MessageHeader<T>)),
-        [this](std::error_code ec, std::size_t length) {
+        [this](std::error_code ec, std::size_t) {
           if (!ec) {
             if (_msgTemporaryIn.Header.Size > 0) {
               _msgTemporaryIn.Body.resize(_msgTemporaryIn.Header.Size);
@@ -120,7 +120,7 @@ class TCPClient {
     asio::async_read(
         _socket,
         asio::buffer(_msgTemporaryIn.Body.data(), _msgTemporaryIn.Body.size()),
-        [this](std::error_code ec, std::size_t length) {
+        [this](std::error_code ec, std::size_t) {
           if (!ec) {
             AddToIncomingMessageQueue();
             DoReadHeader();
@@ -133,16 +133,16 @@ class TCPClient {
   void DoWriteHeader() {
     asio::async_write(
         _socket,
-        asio::buffer(&_messagesOut.Front().Header, sizeof(MessageHeader<T>)),
-        [this](std::error_code ec, std::size_t length) {
+        asio::buffer(&messages_out_.Front().Header, sizeof(MessageHeader<T>)),
+        [this](std::error_code ec, std::size_t) {
           if (!ec) {
-            if (_messagesOut.Front().Body.size() > 0) {
+            if (messages_out_.Front().Body.size() > 0) {
               DoWriteBody();
             }
             // Header-only message
             else {
-              _messagesOut.PopFront();
-              if (!_messagesOut.Empty()) {
+              messages_out_.PopFront();
+              if (!messages_out_.Empty()) {
                 DoWriteHeader();
               }
             }
@@ -154,12 +154,12 @@ class TCPClient {
 
   void DoWriteBody() {
     asio::async_write(_socket,
-                      asio::buffer(_messagesOut.Front().Body.data(),
-                                   _messagesOut.Front().Body.size()),
-                      [this](std::error_code ec, std::size_t length) {
+                      asio::buffer(messages_out_.Front().Body.data(),
+                                   messages_out_.Front().Body.size()),
+                      [this](std::error_code ec, std::size_t) {
                         if (!ec) {
-                          _messagesOut.PopFront();
-                          if (!_messagesOut.Empty()) {
+                          messages_out_.PopFront();
+                          if (!messages_out_.Empty()) {
                             DoWriteHeader();
                           }
                         } else {
@@ -170,7 +170,7 @@ class TCPClient {
 
   void AddToIncomingMessageQueue() {
     _msgTemporaryIn.TCPRemote = nullptr;
-    _messagesIn.PushBack(_msgTemporaryIn);
+    messages_in_.PushBack(_msgTemporaryIn);
   }
 
  public:
@@ -183,10 +183,10 @@ class TCPClient {
   asio::ip::tcp::socket _socket;
   std::thread _threadContext;
 
-  QueueThreadSafe<Message<T>> _messagesIn;
-  QueueThreadSafe<Message<T>> _messagesOut;
+  QueueThreadSafe<Message<T>> messages_in_;
+  QueueThreadSafe<Message<T>> messages_out_;
 
   Message<T> _msgTemporaryIn;
 
-  bool _isConnected = false;
+  bool is_connected_ = false;
 };

@@ -13,8 +13,13 @@ void GameObject::Update() {
   }
 }
 void GameObject::RemoveComponent(Component* component) {
-  if (components_.count(component)) {
-    components_.erase(component);
+  auto it = std::find_if(components_.begin(), components_.end(),
+                         [component](std::shared_ptr<Component> const& i) {
+                           return i.get() == component;
+                         });
+
+  if (it != components_.end()) {
+    components_.erase(it);
   }
 }
 

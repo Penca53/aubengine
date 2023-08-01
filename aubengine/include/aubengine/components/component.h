@@ -10,6 +10,8 @@ class Component {
   virtual void Start() {}
   virtual void Update() {}
 
+  virtual ~Component() = default;
+
  public:
   bool is_enabled = true;
   GameObject* game_object = nullptr;

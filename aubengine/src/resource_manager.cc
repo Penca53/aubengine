@@ -36,9 +36,10 @@ std::shared_ptr<Texture2D> ResourceManager::GetTexture(std::string name) {
 
 void ResourceManager::Clear(GladGLContext* context) {
   // (properly) delete all shaders
-  for (auto& iter : Shaders) context->DeleteProgram(iter.second->id);
+  for (const auto& iter : Shaders) context->DeleteProgram(iter.second->id);
   // (properly) delete all textures
-  for (auto& iter : Textures) context->DeleteTextures(1, &iter.second->ID);
+  for (const auto& iter : Textures)
+    context->DeleteTextures(1, &iter.second->ID);
 }
 
 std::shared_ptr<Shader> ResourceManager::LoadShaderFromFile(

@@ -2,8 +2,8 @@
 
 #include <asio.hpp>
 
-#include "Message.h"
-#include "QueueThreadSafe.h"
+#include "network/message.h"
+#include "network/queue_thread_safe.h"
 
 template <typename T>
 class ClientSession : public std::enable_shared_from_this<ClientSession<T>> {
@@ -11,24 +11,24 @@ class ClientSession : public std::enable_shared_from_this<ClientSession<T>> {
   ClientSession(asio::ip::tcp::socket tcpSocket, asio::io_context& asioContext,
                 QueueThreadSafe<Message<T>>& qIn)
       : _asioContext(asioContext),
-        _tcpSocket(std::move(tcpSocket)),
-        _messagesIn(qIn) {}
+        tcp_socket_(std::move(tcpSocket)),
+        messages_in_(qIn) {}
 
   virtual ~ClientSession() { std::cout << "Destroy Connection\n"; }
 
  public:
   void ConnectToClient(uint32_t id) {
-    if (_tcpSocket.is_open()) {
-      _id = id;
+    if (tcp_socket_.is_open()) {
+      id_ = id;
       DoReadTCPHeader();
-      _isConnected = true;
+      is_connected_ = true;
     }
   }
 
   void Send(const Message<T>& msg) {
     asio::post(_asioContext, [this, msg]() {
-      bool isWritingMessage = !_messagesOut.Empty();
-      _messagesOut.PushBack(msg);
+      bool isWritingMessage = !messages_out_.Empty();
+      messages_out_.PushBack(msg);
       if (!isWritingMessage) {
         DoWriteTCPHeader();
       }
@@ -37,15 +37,15 @@ class ClientSession : public std::enable_shared_from_this<ClientSession<T>> {
 
   void Disconnect() {
     if (IsConnected()) {
-      asio::post(_asioContext, [this]() { _tcpSocket.close(); });
+      asio::post(_asioContext, [this]() { tcp_socket_.close(); });
     }
 
-    _isConnected = false;
+    is_connected_ = false;
   }
 
-  bool IsConnected() const { return _isConnected; }
+  bool IsConnected() const { return is_connected_; }
 
-  uint32_t GetID() { return _id; }
+  uint32_t GetID() { return id_; }
 
   bool TryGetUDPEndpoint(asio::ip::udp::endpoint& endpoint) {
     if (UDPPort == 0) {
@@ -53,7 +53,7 @@ class ClientSession : public std::enable_shared_from_this<ClientSession<T>> {
     }
 
     // Resolve hostname/ip-address into tangiable physical address
-    auto host = _tcpSocket.remote_endpoint().address().to_string();
+    auto host = tcp_socket_.remote_endpoint().address().to_string();
     auto port = std::to_string(UDPPort);
 
     asio::ip::udp::resolver resolver(_asioContext);
@@ -67,9 +67,9 @@ class ClientSession : public std::enable_shared_from_this<ClientSession<T>> {
  private:
   void DoReadTCPHeader() {
     asio::async_read(
-        _tcpSocket,
+        tcp_socket_,
         asio::buffer(&_msgTemporaryIn.Header, sizeof(MessageHeader<T>)),
-        [this](std::error_code ec, std::size_t length) {
+        [this](std::error_code ec, std::size_t) {
           if (!ec) {
             if (_msgTemporaryIn.Header.Size > 0) {
               _msgTemporaryIn.Body.resize(_msgTemporaryIn.Header.Size);
@@ -87,9 +87,9 @@ class ClientSession : public std::enable_shared_from_this<ClientSession<T>> {
 
   void DoReadTCPBody() {
     asio::async_read(
-        _tcpSocket,
+        tcp_socket_,
         asio::buffer(_msgTemporaryIn.Body.data(), _msgTemporaryIn.Body.size()),
-        [this](std::error_code ec, std::size_t length) {
+        [this](std::error_code ec, std::size_t) {
           if (!ec) {
             AddToIncomingMessageQueue();
             DoReadTCPHeader();
@@ -101,17 +101,17 @@ class ClientSession : public std::enable_shared_from_this<ClientSession<T>> {
 
   void DoWriteTCPHeader() {
     asio::async_write(
-        _tcpSocket,
-        asio::buffer(&_messagesOut.Front().Header, sizeof(MessageHeader<T>)),
-        [this](std::error_code ec, std::size_t length) {
+        tcp_socket_,
+        asio::buffer(&messages_out_.Front().Header, sizeof(MessageHeader<T>)),
+        [this](std::error_code ec, std::size_t) {
           if (!ec) {
-            if (_messagesOut.Front().Body.size() > 0) {
+            if (messages_out_.Front().Body.size() > 0) {
               DoWriteTCPBody();
             }
             // Header-only message
             else {
-              _messagesOut.PopFront();
-              if (!_messagesOut.Empty()) {
+              messages_out_.PopFront();
+              if (!messages_out_.Empty()) {
                 DoReadTCPHeader();
               }
             }
@@ -121,13 +121,13 @@ class ClientSession : public std::enable_shared_from_this<ClientSession<T>> {
         });
   }
   void DoWriteTCPBody() {
-    asio::async_write(_tcpSocket,
-                      asio::buffer(_messagesOut.Front().Body.data(),
-                                   _messagesOut.Front().Body.size()),
-                      [this](std::error_code ec, std::size_t length) {
+    asio::async_write(tcp_socket_,
+                      asio::buffer(messages_out_.Front().Body.data(),
+                                   messages_out_.Front().Body.size()),
+                      [this](std::error_code ec, std::size_t) {
                         if (!ec) {
-                          _messagesOut.PopFront();
-                          if (!_messagesOut.Empty()) {
+                          messages_out_.PopFront();
+                          if (!messages_out_.Empty()) {
                             DoReadTCPHeader();
                           }
                         } else {
@@ -138,22 +138,22 @@ class ClientSession : public std::enable_shared_from_this<ClientSession<T>> {
 
   void AddToIncomingMessageQueue() {
     _msgTemporaryIn.TCPRemote = this->shared_from_this();
-    _messagesIn.PushBack(_msgTemporaryIn);
+    messages_in_.PushBack(_msgTemporaryIn);
   }
 
  public:
   uint16_t UDPPort = 0;
 
  private:
-  asio::ip::tcp::socket _tcpSocket;
-
   asio::io_context& _asioContext;
 
-  QueueThreadSafe<Message<T>>& _messagesIn;
-  QueueThreadSafe<Message<T>> _messagesOut;
+  asio::ip::tcp::socket tcp_socket_;
+
+  QueueThreadSafe<Message<T>>& messages_in_;
+  QueueThreadSafe<Message<T>> messages_out_;
 
   Message<T> _msgTemporaryIn;
 
-  uint32_t _id = 0;
-  bool _isConnected = false;
+  uint32_t id_ = 0;
+  bool is_connected_ = false;
 };

@@ -16,18 +16,18 @@ class GameObject {
 
   template <Derived<Component> T, typename... Args>
   T* AddComponent(Args... args) {
-    T* component = new T(args...);
+    std::shared_ptr<T> component = std::make_shared<T>(args...);
     component->SetOwner(this);
     components_.insert(component);
     component->Start();
-    return component;
+    return component.get();
   }
   template <Derived<Component> T>
   T* GetComponent() {
-    for (auto c : components_) {
-      T* a = dynamic_cast<T*>(c);
+    for (const auto& c : components_) {
+      T* a = dynamic_cast<T*>(c.get());
       if (a != nullptr) {
-        return (T*)c;
+        return a;
       }
     }
     return nullptr;
@@ -39,6 +39,6 @@ class GameObject {
   std::string name;
 
  private:
-  std::unordered_set<Component*> components_;
+  std::unordered_set<std::shared_ptr<Component>> components_;
   Scene* scene_ = nullptr;
 };

@@ -13,9 +13,9 @@
 #include "aubengine/resource_manager.h"
 #include "aubengine/shader.h"
 #include "aubengine/sprite_renderer.h"
-#include "network/Net.h"
+#include "network/net.h"
 
-bool isServer = true;
+bool isServer = false;
 
 class FPS {
  protected:
@@ -230,7 +230,7 @@ class NetworkClient : public Component {
       }
       case CustomMsgTypes::WorldState: {
         std::vector<NetState> states = msg.ReadVector<NetState>();
-        for (auto& state : states) {
+        for (const auto& state : states) {
           if (!_entities.count(state.EntityId)) {
             Entity* entity = new Entity();
             entity->EntityId = state.EntityId;
@@ -316,7 +316,7 @@ class NetworkClient : public Component {
   void InterpolateEntities() {
     auto now = std::chrono::steady_clock::now();
     auto renderTimestamp = now - std::chrono::milliseconds(400);
-    for (auto& it : _entities) {
+    for (const auto& it : _entities) {
       Entity* entity = it.second;
       if (entity->EntityId == _entityId) {
         continue;
@@ -460,7 +460,7 @@ class NetworkServer : public Component {
     Message<CustomMsgTypes> msg;
     msg.Header.ID = CustomMsgTypes::WorldState;
     std::vector<NetState> states;
-    for (auto& it : _entities) {
+    for (const auto& it : _entities) {
       NetState state;
       state.EntityId = it.second.EntityId;
       state.Position = it.second.X;
@@ -469,7 +469,7 @@ class NetworkServer : public Component {
     }
 
     msg.WriteVector(states);
-    for (auto& conn : _tcpServer.Connections) {
+    for (const auto& conn : _tcpServer.Connections) {
       asio::ip::udp::endpoint endpoint;
       if (conn->TryGetUDPEndpoint(endpoint)) {
         msg.UDPRemote = endpoint;
@@ -501,7 +501,7 @@ class NetworkServerPrefab : public GameObject {
 
 class MainScene : public Scene {
  public:
-  MainScene(std::shared_ptr<Window> window, SpriteRenderer* renderer)
+  MainScene(Window* window, SpriteRenderer* renderer)
       : Scene(window, renderer) {
     auto ctx = static_cast<GladGLContext*>(window->GetContext());
     ResourceManager::LoadShader("../../aubengine/src/shaders/default.vs.glsl",
@@ -542,21 +542,17 @@ void TesterInitializer() {
       std::make_shared<MainScene>(window1, &renderer);
   window1->SetScene(mainScene1);
 
-  /*
-  auto window2 = app.CreateWindowOpenGL();
-  window2->Initialize("Second", 800, 600);
-  window2->SetVSync(true);
+  // auto window2 = app.CreateWindowOpenGL();
+  // window2->Initialize("Second", 800, 600);
+  // window2->SetVSync(true);
 
-  window2->Use();
-  std::shared_ptr<MainScene> mainScene2 = std::make_shared<MainScene>(window2,
-  &renderer); window1->SetScene(mainScene2);
-  */
+  // window2->Use();
+  // std::shared_ptr<MainScene> mainScene2 =
+  //     std::make_shared<MainScene>(window2, &renderer);
+  // window1->SetScene(mainScene2);
 }
 
 int main(int argc, char* argv[]) {
-  using recursive_directory_iterator =
-      std::filesystem::recursive_directory_iterator;
-
   if (argc > 1) {
     if (strcmp(argv[1], "false") == 0) {
       isServer = false;

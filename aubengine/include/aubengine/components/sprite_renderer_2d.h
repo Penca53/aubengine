@@ -12,14 +12,12 @@
 class SpriteRenderer2D : public Component {
  public:
   SpriteRenderer2D(std::shared_ptr<Shader> shader,
-                   std::shared_ptr<Texture2D> texture2D) {
-    _shader = shader;
-    _texture2D = texture2D;
-  }
+                   std::shared_ptr<Texture2D> texture2D)
+      : shader_(shader), texture_2d_(texture2D) {}
 
   virtual void Start() override {
-    _context =
-        (GladGLContext*)game_object->GetScene()->GetWindow()->GetContext();
+    context_ = static_cast<GladGLContext*>(
+        game_object->GetScene()->GetWindow()->GetContext());
 
     float vertices[] = {
         // pos			    // tex
@@ -29,38 +27,38 @@ class SpriteRenderer2D : public Component {
 
     unsigned int indices[] = {0, 1, 3, 1, 2, 3};
 
-    _context->GenVertexArrays(1, &_quadVAO);
-    _context->GenBuffers(1, &_quadEBO);
-    _context->GenBuffers(1, &_quadVBO);
+    context_->GenVertexArrays(1, &quad_vao_);
+    context_->GenBuffers(1, &quad_ebo_);
+    context_->GenBuffers(1, &quad_vbo_);
 
-    _context->BindVertexArray(_quadVAO);
+    context_->BindVertexArray(quad_vao_);
 
-    _context->BindBuffer(GL_ARRAY_BUFFER, _quadVBO);
-    _context->BufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices,
+    context_->BindBuffer(GL_ARRAY_BUFFER, quad_vbo_);
+    context_->BufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices,
                          GL_STATIC_DRAW);
 
-    _context->BindBuffer(GL_ELEMENT_ARRAY_BUFFER, _quadEBO);
-    _context->BufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
+    context_->BindBuffer(GL_ELEMENT_ARRAY_BUFFER, quad_ebo_);
+    context_->BufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,
                          GL_STATIC_DRAW);
 
     // Position
-    _context->VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
+    context_->VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
                                   (void*)0);
-    _context->EnableVertexAttribArray(0);
+    context_->EnableVertexAttribArray(0);
     // TexCoord
-    _context->VertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
+    context_->VertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
                                   (void*)(2 * sizeof(float)));
-    _context->EnableVertexAttribArray(1);
+    context_->EnableVertexAttribArray(1);
 
-    _context->BindVertexArray(0);
+    context_->BindVertexArray(0);
   }
 
  public:
-  std::shared_ptr<Shader> _shader = nullptr;
-  std::shared_ptr<Texture2D> _texture2D = nullptr;
-  glm::vec3 Color = {1, 1, 1};
-  GladGLContext* _context = nullptr;
-  unsigned int _quadVAO = 0;
-  unsigned int _quadEBO = 0;
-  unsigned int _quadVBO = 0;
+  std::shared_ptr<Shader> shader_ = nullptr;
+  std::shared_ptr<Texture2D> texture_2d_ = nullptr;
+  glm::vec3 color_ = {1, 1, 1};
+  GladGLContext* context_ = nullptr;
+  unsigned int quad_vao_ = 0;
+  unsigned int quad_ebo_ = 0;
+  unsigned int quad_vbo_ = 0;
 };

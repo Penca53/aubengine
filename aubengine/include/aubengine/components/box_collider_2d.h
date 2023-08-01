@@ -7,9 +7,9 @@
 
 class BoxCollider2D : public Component {
  public:
-  glm::vec3 Position{};
-  glm::vec3 Size{};
-  glm::vec3 EulerRotation{};
+  glm::vec3 position{};
+  glm::vec3 size{};
+  glm::vec3 euler_rotation{};
 
  public:
   virtual void Start() override {}

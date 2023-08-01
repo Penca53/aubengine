@@ -12,7 +12,7 @@ class SpriteRenderer;
 
 class Scene {
  public:
-  Scene(std::shared_ptr<Window> window, SpriteRenderer* renderer);
+  Scene(Window* window, SpriteRenderer* renderer);
   virtual ~Scene() = default;
 
   void Update();
@@ -20,16 +20,16 @@ class Scene {
 
   template <Derived<GameObject> T>
   T* Instantiate() {
-    T* go = new T(this);
+    std::shared_ptr<T> go = std::make_shared<T>(this);
     game_objects_.insert(go);
-    return go;
+    return go.get();
   }
   void Destroy(GameObject* gameObject);
-  std::shared_ptr<Window> GetWindow();
+  Window* GetWindow();
 
  private:
-  std::shared_ptr<Window> window_ = nullptr;
+  Window* window_ = nullptr;
   SpriteRenderer* renderer_ = nullptr;
 
-  std::unordered_set<GameObject*> game_objects_;
+  std::unordered_set<std::shared_ptr<GameObject>> game_objects_;
 };

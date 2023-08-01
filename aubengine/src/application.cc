@@ -13,7 +13,7 @@ Application& Application::GetInstance() {
   return s;
 }
 
-Application& Application::SetUpdateRate(unsigned int hz) {
+Application& Application::SetUpdateRate(uint32_t hz) {
   hz_ = hz;
   return *this;
 }
@@ -21,7 +21,7 @@ Application& Application::SetUpdateRate(unsigned int hz) {
 uint64_t Application::MillisecondsPerUpdate() { return 1000LL / hz_; }
 uint64_t Application::NanosecondsPerUpdate() { return 1000000000LL / hz_; }
 
-void Application::Run(unsigned int hz) {
+void Application::Run(uint32_t hz) {
   SetUpdateRate(hz);
   Run();
 }
@@ -30,7 +30,7 @@ void Application::Run() {
   uint64_t lag = 0;
   while (true) {
     bool shouldClose = false;
-    for (auto& window : windows) {
+    for (const auto& window : windows) {
       shouldClose |= window->WindowShouldClose();
     }
 
@@ -56,34 +56,34 @@ void Application::Run() {
     Render();
   }
 
-  for (auto& window : windows) {
+  for (const auto& window : windows) {
     ResourceManager::Clear((GladGLContext*)window->GetContext());
   }
 }
 
 void Application::PollInput() {
-  for (auto& window : windows) {
+  for (const auto& window : windows) {
     window->Begin();
   }
   Input::PollInput();
 }
 
 void Application::Update() {
-  for (auto& window : windows) {
+  for (const auto& window : windows) {
     window->Update();
   }
 }
 
 void Application::Render() {
-  for (auto& window : windows) {
+  for (const auto& window : windows) {
     window->Render();
     window->End();
   }
 }
 
-std::shared_ptr<Window> Application::CreateWindowOpenGL() {
+Window* Application::CreateWindowOpenGL() {
   std::shared_ptr<Window> window = std::make_shared<WindowOpenGL>();
   windows.push_back(window);
-  return window;
+  return window.get();
 }
 }  // namespace Aubengine
