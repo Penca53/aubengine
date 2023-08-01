@@ -1,9 +1,9 @@
 #pragma once
 
+#define GLM_FORCE_CXX11
+
 #include <memory>
 #include <vector>
-
-#pragma warning(disable : 4201)
 
 #include "aubengine/render_api.h"
 #include "aubengine/window.h"
