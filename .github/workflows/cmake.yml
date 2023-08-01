@@ -28,7 +28,7 @@ jobs:
 
       - if: matrix.os == 'ubuntu-latest'
         name: "Install deps (Ubuntu)"
-        run: sudo apt-get install libxrandr-dev libxinerama-dev libxcursor-dev
+        run: sudo apt-get install libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
 
       - name: "Install deps"
         run: pip install Jinja2
