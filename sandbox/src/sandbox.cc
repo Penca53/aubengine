@@ -471,11 +471,11 @@ class NetworkServer : public Component {
 
     msg.WriteVector(states);
     for (const auto& conn : _tcpServer.Connections) {
-      asio::ip::udp::endpoint endpoint;
-      if (conn->TryGetUDPEndpoint(endpoint)) {
-        msg.UDPRemote = endpoint;
-        _udpServer.Send(msg);
+      if (!conn->IsConnected()) {
+        continue;
       }
+      msg.UDPRemote = conn->udp_endpoint;
+      _udpServer.Send(msg);
     }
   }
 
@@ -543,17 +543,17 @@ void TesterInitializer() {
       std::make_shared<MainScene>(window1, &renderer);
   window1->SetScene(mainScene1);
 
-  if (isServer) {
-    return;
-  }
-  auto window2 = app.CreateWindowOpenGL();
-  window2->Initialize("Second", 800, 600);
-  window2->SetVSync(true);
+  // if (isServer) {
+  //   return;
+  // }
+  // auto window2 = app.CreateWindowOpenGL();
+  // window2->Initialize("Second", 800, 600);
+  // window2->SetVSync(true);
 
-  window2->Use();
-  std::shared_ptr<MainScene> mainScene2 =
-      std::make_shared<MainScene>(window2, &renderer);
-  window2->SetScene(mainScene2);
+  // window2->Use();
+  // std::shared_ptr<MainScene> mainScene2 =
+  //     std::make_shared<MainScene>(window2, &renderer);
+  // window2->SetScene(mainScene2);
 }
 
 int main(int argc, char* argv[]) {

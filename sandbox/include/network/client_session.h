@@ -20,6 +20,15 @@ class ClientSession : public std::enable_shared_from_this<ClientSession<T>> {
   void ConnectToClient(uint32_t id) {
     if (tcp_socket_.is_open()) {
       id_ = id;
+
+      auto host = tcp_socket_.remote_endpoint().address().to_string();
+      auto port = std::to_string(UDPPort);
+
+      asio::ip::udp::resolver resolver(_asioContext);
+      asio::ip::udp::resolver::results_type endpoints =
+          resolver.resolve(host, port);
+      udp_endpoint = *endpoints.begin();
+
       DoReadTCPHeader();
       is_connected_ = true;
     }
@@ -41,28 +50,13 @@ class ClientSession : public std::enable_shared_from_this<ClientSession<T>> {
     }
 
     is_connected_ = false;
+
+    std::cout << "Client disconnected" << std::endl;
   }
 
   bool IsConnected() const { return is_connected_; }
 
   uint32_t GetID() { return id_; }
-
-  bool TryGetUDPEndpoint(asio::ip::udp::endpoint& endpoint) {
-    if (UDPPort == 0) {
-      return false;
-    }
-
-    // Resolve hostname/ip-address into tangiable physical address
-    auto host = tcp_socket_.remote_endpoint().address().to_string();
-    auto port = std::to_string(UDPPort);
-
-    asio::ip::udp::resolver resolver(_asioContext);
-    asio::ip::udp::resolver::results_type endpoints =
-        resolver.resolve(host, port);
-    endpoint = *endpoints.begin();
-
-    return true;
-  }
 
  private:
   void DoReadTCPHeader() {
@@ -142,6 +136,7 @@ class ClientSession : public std::enable_shared_from_this<ClientSession<T>> {
   }
 
  public:
+  asio::ip::udp::endpoint udp_endpoint;
   uint16_t UDPPort = 0;
 
  private:
