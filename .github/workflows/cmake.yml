@@ -28,7 +28,7 @@ jobs:
 
       - if: matrix.os == 'ubuntu-latest'
         name: "Install deps (Ubuntu)"
-        run: sudo apt install libx11-dev
+        run: sudo apt-get install libx11-dev
 
       - name: "Install deps"
         run: pip install Jinja2
