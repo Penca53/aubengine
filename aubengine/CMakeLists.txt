@@ -14,14 +14,12 @@ file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS
         )
 add_library(${PROJECT_NAME} ${SRC_FILES})
 
-add_compile_definitions(GLM_FORCE_CXX11)
-
 target_include_directories(${PROJECT_NAME} PUBLIC ./include)
 
 if(MSVC)
-  target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX)
+  target_compile_options(${PROJECT_NAME} PRIVATE /Wall)
 else()
-  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic )
+  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
 FetchContent_Declare(

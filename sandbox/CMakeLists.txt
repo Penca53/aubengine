@@ -19,9 +19,9 @@ target_include_directories(${PROJECT_NAME} PRIVATE ./third_party/asio/asio/inclu
 target_include_directories(${PROJECT_NAME} PUBLIC ./include)
 
 if(MSVC)
-  target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX)
+  target_compile_options(${PROJECT_NAME} PRIVATE /Wall)
 else()
-  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic )
+  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
 target_link_libraries(${PROJECT_NAME} PRIVATE aubengine)
