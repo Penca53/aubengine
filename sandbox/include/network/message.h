@@ -56,7 +56,6 @@ class Message {
                   "Data is too complex to be pushed into vector");
 
     size_t old = Body.size();
-    Body.resize(Body.size() + sizeof(data));
     std::memcpy(Body.data() + old, &data, sizeof(data));
     Header.Size = Size();
   }
