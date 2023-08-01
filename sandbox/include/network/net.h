@@ -12,8 +12,8 @@
 #include <asio/ts/buffer.hpp>
 #include <asio/ts/internet.hpp>
 
-#include "ClientSession.h"
-#include "TCPClient.h"
-#include "TCPServer.h"
-#include "UDPClient.h"
-#include "UDPServer.h"
+#include "network/client_session.h"
+#include "network/tcp_client.h"
+#include "network/tcp_server.h"
+#include "network/udp_client.h"
+#include "network/udp_server.h"
