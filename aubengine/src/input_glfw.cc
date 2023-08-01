@@ -19,7 +19,7 @@ void InputGLFW::PollInputImpl() {
   }
 
   GLFWwindow* window = static_cast<GLFWwindow*>(
-      Aubengine::Application::GetInstance().windows[0]->GetWindowNative());
+      Aubengine::Application::GetInstance().focused_window->GetWindowNative());
   for (int i = 0; i <= GLFW_KEY_LAST; ++i) {
     key_states_[i] = (glfwGetKey(window, i));
   }

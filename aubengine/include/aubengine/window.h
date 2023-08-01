@@ -9,7 +9,7 @@ class Window {
  public:
   virtual ~Window() = default;
 
-  virtual bool Initialize(std::string name, uint32_t width,
+  virtual bool Initialize(const std::string& name, uint32_t width,
                           uint32_t height) = 0;
   virtual void Close() = 0;
   virtual bool WindowShouldClose() = 0;

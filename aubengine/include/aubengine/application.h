@@ -33,6 +33,7 @@ class Application {
 
  public:
   std::vector<std::shared_ptr<Window>> windows;
+  Window* focused_window = nullptr;
 
  private:
   uint32_t hz_ = 0;

@@ -13,7 +13,7 @@ class WindowOpenGL : public Window {
  public:
   virtual ~WindowOpenGL();
 
-  virtual bool Initialize(std::string name, uint32_t width,
+  virtual bool Initialize(const std::string& name, uint32_t width,
                           uint32_t height) override;
   virtual void Close() override;
   virtual bool WindowShouldClose() override;

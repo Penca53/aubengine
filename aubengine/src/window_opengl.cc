@@ -2,12 +2,14 @@
 
 #include <iostream>
 
-static std::unordered_map<GLFWwindow*, GladGLContext*> _windowToContext;
+#include "aubengine/application.h"
+
+static std::unordered_map<GLFWwindow*, WindowOpenGL*> window_to_this_;
 uint8_t WindowOpenGL::window_opengl_instances_count_ = 0;
 
 WindowOpenGL::~WindowOpenGL() { Close(); }
 
-bool WindowOpenGL::Initialize(std::string title, uint32_t width,
+bool WindowOpenGL::Initialize(const std::string& title, uint32_t width,
                               uint32_t height) {
   if (window_opengl_instances_count_ == 0) {
     glfwInit();
@@ -37,17 +39,24 @@ bool WindowOpenGL::Initialize(std::string title, uint32_t width,
     return false;
   }
 
-  _windowToContext[window_] = context_;
+  window_to_this_[window_] = this;
 
   ++window_opengl_instances_count_;
   glfwSetFramebufferSizeCallback(window_,
                                  [](GLFWwindow* window, int width, int height) {
                                    glfwMakeContextCurrent(window);
-                                   auto ctx = _windowToContext[window];
-                                   ctx->Viewport(0, 0, width, height);
+                                   auto w = window_to_this_[window];
+                                   w->context_->Viewport(0, 0, width, height);
                                  });
-  context_->Viewport(0, 0, width, height);
 
+  glfwSetWindowFocusCallback(window_, [](GLFWwindow* window, int focused) {
+    if (focused) {
+      Aubengine::Application::GetInstance().focused_window =
+          window_to_this_[window];
+    }
+  });
+
+  context_->Viewport(0, 0, width, height);
   return true;
 }
 void WindowOpenGL::Close() {

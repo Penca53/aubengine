@@ -15,7 +15,7 @@
 #include "aubengine/sprite_renderer.h"
 #include "network/net.h"
 
-bool isServer = false;
+bool isServer = true;
 
 class FPS {
  protected:
@@ -542,14 +542,17 @@ void TesterInitializer() {
       std::make_shared<MainScene>(window1, &renderer);
   window1->SetScene(mainScene1);
 
-  // auto window2 = app.CreateWindowOpenGL();
-  // window2->Initialize("Second", 800, 600);
-  // window2->SetVSync(true);
+  if (isServer) {
+    return;
+  }
+  auto window2 = app.CreateWindowOpenGL();
+  window2->Initialize("Second", 800, 600);
+  window2->SetVSync(true);
 
-  // window2->Use();
-  // std::shared_ptr<MainScene> mainScene2 =
-  //     std::make_shared<MainScene>(window2, &renderer);
-  // window1->SetScene(mainScene2);
+  window2->Use();
+  std::shared_ptr<MainScene> mainScene2 =
+      std::make_shared<MainScene>(window2, &renderer);
+  window2->SetScene(mainScene2);
 }
 
 int main(int argc, char* argv[]) {
