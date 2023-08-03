@@ -21,6 +21,7 @@ class Application {
   Window* CreateWindowOpenGL();
 
   void PollInput();
+  void PhysicsUpdate();
   void Update();
   void Render();
 

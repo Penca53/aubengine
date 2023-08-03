@@ -4,10 +4,9 @@
 #include "aubengine/components/transform.h"
 
 void SpriteRenderer::DrawSprite(GameObject* go) {
-  Transform* transform = go->GetComponent<Transform>();
   SpriteRenderer2D* sprite = go->GetComponent<SpriteRenderer2D>();
 
-  if (!transform || !sprite) {
+  if (!go->transform || !sprite) {
     return;
   }
 
@@ -16,20 +15,21 @@ void SpriteRenderer::DrawSprite(GameObject* go) {
   glm::mat4 model = glm::mat4(1.0f);
   model = glm::translate(
       model,
-      transform->position);  // first translate (transformations are: scale
-                             // happens first, then rotation, and then final
-                             // translation happens; reversed order)
+      go->transform->position);  // first translate (transformations are: scale
+                                 // happens first, then rotation, and then final
+                                 // translation happens; reversed order)
 
   model = glm::translate(
-      model, glm::vec3(0.5f * transform->size.x, 0.5f * transform->size.y,
-                       0.0f));  // move origin of rotation to center of quad
-  model = glm::rotate(model, glm::radians(transform->euler_rotation.z),
+      model,
+      glm::vec3(0.5f * go->transform->size.x, 0.5f * go->transform->size.y,
+                0.0f));  // move origin of rotation to center of quad
+  model = glm::rotate(model, glm::radians(go->transform->euler_rotation.z),
                       glm::vec3(0.0f, 0.0f, 1.0f));  // then rotate
-  model = glm::translate(
-      model, glm::vec3(-0.5f * transform->size.x, -0.5f * transform->size.y,
-                       0.0f));  // move origin back
+  model = glm::translate(model, glm::vec3(-0.5f * go->transform->size.x,
+                                          -0.5f * go->transform->size.y,
+                                          0.0f));  // move origin back
 
-  model = glm::scale(model, transform->size);  // last scale
+  model = glm::scale(model, go->transform->size);  // last scale
   auto projection = glm::ortho(0.0f, 800.0f, 0.0f, 600.0f);
 
   sprite->shader_->SetInteger("image", 0);

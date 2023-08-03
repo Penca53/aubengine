@@ -21,6 +21,7 @@ class WindowOpenGL : public Window {
   virtual void* GetContext() override;
   virtual void Begin() override;
   virtual void End() override;
+  virtual void PhysicsUpdate() override;
   virtual void Update() override;
   virtual void Render() override;
   virtual void Use() override;

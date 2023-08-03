@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "aubengine/application.h"
+#include "aubengine/scene.h"
 
 static std::unordered_map<GLFWwindow*, WindowOpenGL*> window_to_this_;
 uint8_t WindowOpenGL::window_opengl_instances_count_ = 0;
@@ -76,6 +77,15 @@ void* WindowOpenGL::GetContext() { return context_; }
 void WindowOpenGL::Begin() { glfwPollEvents(); }
 
 void WindowOpenGL::End() { glfwSwapBuffers(window_); }
+
+void WindowOpenGL::PhysicsUpdate() {
+  if (!scene_) {
+    return;
+  }
+
+  Use();
+  scene_->PhysicsUpdate();
+}
 
 void WindowOpenGL::Update() {
   if (!scene_) {

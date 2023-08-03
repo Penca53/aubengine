@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "aubengine/scene.h"
+class Scene;
 
 class Window {
  public:
@@ -18,6 +18,7 @@ class Window {
   virtual void Use() = 0;
   virtual void Begin() = 0;
   virtual void End() = 0;
+  virtual void PhysicsUpdate() = 0;
   virtual void Update() = 0;
   virtual void Render() = 0;
   virtual bool GetVSync() = 0;

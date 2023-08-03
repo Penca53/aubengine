@@ -12,6 +12,7 @@
 #include "aubengine/input.h"
 #include "aubengine/prefab.h"
 #include "aubengine/resource_manager.h"
+#include "aubengine/scene.h"
 #include "aubengine/shader.h"
 #include "aubengine/sprite_renderer.h"
 #include "network/net.h"
@@ -83,20 +84,15 @@ struct NetState {
 
 class MovementManager : public Component {
  public:
-  virtual void Start() override {
-    transform_ = game_object->GetComponent<Transform>();
-  }
-
   virtual void Update() override {
     if (entity_) {
-      transform_->position.x = entity_->X;
+      game_object->transform->position.x = entity_->X;
     }
   }
 
   void SetEntity(Entity* entity) { entity_ = entity; }
 
  private:
-  Transform* transform_ = nullptr;
   Entity* entity_ = nullptr;
 };
 
@@ -104,15 +100,16 @@ class PlayerPaddlePrefab : public GameObject {
  public:
   PlayerPaddlePrefab(Scene* scene) : GameObject("PlayerPaddle", scene) {
     Transform* transform = AddComponent<Transform>();
+    transform->position = {400, 100, 0};
+    transform->size = {512 / 5.0, 128 / 5.0, 1};
+
     auto shader = ResourceManager::GetShader("default");
     auto texture = ResourceManager::GetTexture("paddle");
 
     AddComponent<SpriteRenderer2D>(shader, texture);
+    AddComponent<RigidBody2D>(RigidBody2D::BodyType::kKinematic);
     AddComponent<BoxCollider2D>();
     AddComponent<MovementManager>();
-
-    transform->position = {400, 300, 0};
-    transform->size = {512 / 5.0, 128 / 5.0, 1};
   }
 };
 
@@ -120,14 +117,15 @@ class BlockPrefab : public GameObject {
  public:
   BlockPrefab(Scene* scene) : GameObject("Block", scene) {
     Transform* transform = AddComponent<Transform>();
+    transform->position = {400, 300, 0};
+    transform->size = {128 / 4.0, 128 / 4.0, 1};
+
     auto shader = ResourceManager::GetShader("default");
     auto texture = ResourceManager::GetTexture("block");
 
     AddComponent<SpriteRenderer2D>(shader, texture);
+    AddComponent<RigidBody2D>(RigidBody2D::BodyType::kDynamic);
     AddComponent<BoxCollider2D>();
-
-    transform->position = {400, 300, 0};
-    transform->size = {128 / 4.0, 128 / 4.0, 1};
   }
 };
 
@@ -430,7 +428,14 @@ class NetworkServer : public Component {
         uint16_t port = msg.Read<uint16_t>();
         std::cout << "Their port is " << port << "\n";
 
-        msg.TCPRemote->UDPPort = port;
+        auto host =
+            msg.TCPRemote->tcp_socket_.remote_endpoint().address().to_string();
+
+        asio::ip::udp::resolver resolver(msg.TCPRemote->_asioContext);
+        asio::ip::udp::resolver::results_type endpoints =
+            resolver.resolve(host, std::to_string(port));
+
+        msg.TCPRemote->udp_endpoint = *endpoints.begin();
         break;
       }
       case CustomMsgTypes::Movement: {
@@ -521,7 +526,7 @@ class MainScene : public Scene {
 
     for (int i = 0; i < 5; ++i) {
       auto block = Instantiate<BlockPrefab>();
-      block->GetComponent<Transform>()->position.x = i * 100 + 100;
+      block->transform->position.x = i * 100 + 100;
     }
   }
 

@@ -36,6 +36,18 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(glad)
 
+add_subdirectory("${glad_SOURCE_DIR}/cmake" glad_cmake)
+glad_add_library(glad_gl_core_mx_46 MX API gl:core=4.6)
+
+FetchContent_Declare(
+    box2d
+    URL https://github.com/erincatto/box2d/archive/refs/tags/v2.4.1.zip
+)
+
+set(BOX2D_BUILD_TESTBED False)
+set(BOX2D_BUILD_UNIT_TESTS False)
+FetchContent_MakeAvailable(box2d)
+
 FetchContent_Declare(
     glfw
     URL https://github.com/glfw/glfw/releases/download/3.3.8/glfw-3.3.8.zip
@@ -43,7 +55,4 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(glfw)
 
-add_subdirectory("${glad_SOURCE_DIR}/cmake" glad_cmake)
-glad_add_library(glad_gl_core_mx_46 MX API gl:core=4.6)
-
-target_link_libraries(${PROJECT_NAME} PUBLIC glm glad_gl_core_mx_46 glfw)
+target_link_libraries(${PROJECT_NAME} PUBLIC glm glad_gl_core_mx_46 glfw box2d)

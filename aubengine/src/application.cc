@@ -3,6 +3,7 @@
 #include <chrono>
 #include <iostream>
 
+#include "aubengine/components/rigid_body_2d.h"
 #include "aubengine/input.h"
 #include "aubengine/resource_manager.h"
 #include "aubengine/window_opengl.h"
@@ -49,6 +50,7 @@ void Application::Run() {
 
     while (lag >= NanosecondsPerUpdate()) {
       PollInput();
+      PhysicsUpdate();
       Update();
       lag -= NanosecondsPerUpdate();
     }
@@ -66,6 +68,17 @@ void Application::PollInput() {
     window->Begin();
   }
   Input::PollInput();
+}
+
+int32_t velocityIterations = 6;
+int32_t positionIterations = 2;
+
+void Application::PhysicsUpdate() {
+  for (const auto& window : windows) {
+    window->PhysicsUpdate();
+  }
+
+  RigidBody2D::world.Step(1.0 / hz_, velocityIterations, positionIterations);
 }
 
 void Application::Update() {

@@ -20,15 +20,6 @@ class ClientSession : public std::enable_shared_from_this<ClientSession<T>> {
   void ConnectToClient(uint32_t id) {
     if (tcp_socket_.is_open()) {
       id_ = id;
-
-      auto host = tcp_socket_.remote_endpoint().address().to_string();
-      auto port = std::to_string(UDPPort);
-
-      asio::ip::udp::resolver resolver(_asioContext);
-      asio::ip::udp::resolver::results_type endpoints =
-          resolver.resolve(host, port);
-      udp_endpoint = *endpoints.begin();
-
       DoReadTCPHeader();
       is_connected_ = true;
     }
@@ -137,13 +128,10 @@ class ClientSession : public std::enable_shared_from_this<ClientSession<T>> {
 
  public:
   asio::ip::udp::endpoint udp_endpoint;
-  uint16_t UDPPort = 0;
-
- private:
   asio::io_context& _asioContext;
-
   asio::ip::tcp::socket tcp_socket_;
 
+ private:
   QueueThreadSafe<Message<T>>& messages_in_;
   QueueThreadSafe<Message<T>> messages_out_;
 

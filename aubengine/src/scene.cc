@@ -6,6 +6,12 @@
 Scene::Scene(Window* window, SpriteRenderer* renderer)
     : window_(window), renderer_(renderer) {}
 
+void Scene::PhysicsUpdate() {
+  for (const auto& go : game_objects_) {
+    go->PhysicsUpdate();
+  }
+}
+
 void Scene::Update() {
   for (const auto& go : game_objects_) {
     go->Update();

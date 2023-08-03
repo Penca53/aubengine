@@ -3,9 +3,9 @@
 #include <memory>
 #include <unordered_set>
 
+#include "aubengine/game_object.h"
 #include "aubengine/utils/derived.h"
 
-class GameObject;
 class Window;
 class Prefab;
 class SpriteRenderer;
@@ -15,6 +15,7 @@ class Scene {
   Scene(Window* window, SpriteRenderer* renderer);
   virtual ~Scene() = default;
 
+  void PhysicsUpdate();
   void Update();
   void Render();
 

@@ -64,8 +64,8 @@ class UDPServer {
     _udpSocket.async_send_to(asio::buffer(_outUdpBuffer, length),
                              message.UDPRemote,
                              [this](std::error_code ec, std::size_t) {
+                               messages_out_.PopFront();
                                if (!ec) {
-                                 messages_out_.PopFront();
                                  if (!messages_out_.Empty()) {
                                    DoSend();
                                  }
