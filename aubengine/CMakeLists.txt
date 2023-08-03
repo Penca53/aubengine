@@ -44,8 +44,8 @@ FetchContent_Declare(
     URL https://github.com/erincatto/box2d/archive/refs/tags/v2.4.1.zip
 )
 
-set(BOX2D_BUILD_TESTBED False)
-set(BOX2D_BUILD_UNIT_TESTS False)
+set(BOX2D_BUILD_TESTBED OFF)
+set(BOX2D_BUILD_UNIT_TESTS OFF)
 FetchContent_MakeAvailable(box2d)
 
 FetchContent_Declare(
